@@ -38,7 +38,27 @@ namespace ImmersiveX
 
         public string FailureReason { get; private set; }
 
+        /// <summary>The mapped room (F2), or null when none is mapped.</summary>
+        public MappedSpace CurrentSpace => _room?.Space;
+
+        /// <summary>Where the user can walk in <see cref="CurrentSpace"/>, in <see cref="FloorPose"/> space.</summary>
+        public WalkableArea Walkable => _room?.Walkable;
+
+        /// <summary>The floor's pose this session.</summary>
+        public Pose FloorPose => _room?.FloorPose ?? Pose.identity;
+
+        /// <summary>One line describing the room mapping state, for status displays.</summary>
+        public string RoomStatus => _room != null ? _room.Status
+            : Platform != null && Platform.Capabilities.RoomData == RoomDataSource.None ? "This platform has no room data."
+            : State < SessionState.Space ? "Waiting…"
+            : "Room access wasn't granted.";
+
         public event Action<SessionState> StateChanged;
+
+        /// <summary>Raised after a room is recognised, saved or rescanned.</summary>
+        public event Action<MappedSpace> SpaceReady;
+
+        RoomMappingFlow _room;
 
         void Awake()
         {
@@ -77,6 +97,12 @@ namespace ImmersiveX
             Platform = PlatformRegistry.ResolveActive();
             Platform.RegisterProviders();
             ImmersiveXLog.Info($"Platform: {Platform.DisplayName} ({Platform.Id}). {Platform.Capabilities}");
+            if (Platform.Capabilities.SeeThrough != SeeThroughMode.None || Platform.Capabilities.RoomData != RoomDataSource.None)
+            {
+                // The camera, the room's planes and anchors must share one space. A rig's camera height offset (meant
+                // for seated VR) would lift the camera above the real floor, so room content would sit below it and drift.
+                Origin.CameraYOffset = 0f;
+            }
             var roomManagers = PrepareArFoundation();
 
             Enter(SessionState.Permissions);
@@ -92,17 +118,49 @@ namespace ImmersiveX
             Enter(SessionState.Space);
             if (HasRoomAccess && Platform.Capabilities.RoomData != RoomDataSource.None)
             {
-                foreach (var manager in roomManagers)
-                    manager.enabled = true;
+                _room = new RoomMappingFlow(this, (ARPlaneManager)roomManagers[0], (ARBoundingBoxManager)roomManagers[1], new SpaceLibrary());
+                yield return _room.Map(rescan: false);
+                if (_room.Space != null)
+                    SpaceReady?.Invoke(_room.Space);
             }
-            // Guided room mapping and saved rooms arrive in milestone M2.
 
             Enter(SessionState.Content);
             yield return WaitForTracking();
+            var cameraOffset = Origin.CameraFloorOffsetObject != null ? Origin.CameraFloorOffsetObject.transform.localPosition.y : 0f;
+            ImmersiveXLog.Info($"Tracking origin: {Origin.CurrentTrackingOriginMode} · camera offset {cameraOffset:0.00} m · " +
+                               $"head at {Origin.Camera.transform.position.y:0.00} m");
             PlaceContent();
 
             Enter(SessionState.Ready);
         }
+
+        /// <summary>Map the room again (Quest: Space Setup) and update the saved room. Only while Ready.</summary>
+        public void RescanRoom()
+        {
+            if (State != SessionState.Ready || _room == null || _room.IsBusy)
+                return;
+            StartCoroutine(RescanRoutine());
+        }
+
+        IEnumerator RescanRoutine()
+        {
+            yield return _room.Map(rescan: true);
+            if (_room.Space != null)
+                SpaceReady?.Invoke(_room.Space);
+        }
+
+        /// <summary>Delete ImmersiveX's saved copy of the current room.</summary>
+        public void ForgetRoom() => _room?.Forget();
+
+        /// <summary>Draw the walkable area on the floor for a few seconds.</summary>
+        public void ShowWalkableArea() => _room?.ShowWalkableArea();
+
+        /// <summary>Finish or skip the guided look-around (platforms where the app detects the room itself).</summary>
+        public void FinishGuidedScan() => _room?.FinishGuidedScan();
+
+        public void SkipGuidedScan() => _room?.SkipGuidedScan();
+
+        void OnApplicationPause(bool paused) => _room?.OnApplicationPause(paused);
 
         void Enter(SessionState state)
         {
@@ -182,7 +240,8 @@ namespace ImmersiveX
             while (waitedWhileFocused < TrackingTimeoutSeconds)
             {
                 var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
-                var tracked = head.isValid && head.TryGetFeatureValue(CommonUsages.isTracked, out var isTracked) && isTracked;
+                var tracked = (head.isValid && head.TryGetFeatureValue(CommonUsages.isTracked, out var isTracked) && isTracked) ||
+                              ARSession.state == ARSessionState.SessionTracking;
                 if (Application.isFocused)
                     waitedWhileFocused += Time.unscaledDeltaTime;
                 stableFor = tracked && Application.isFocused ? stableFor + Time.unscaledDeltaTime : 0f;

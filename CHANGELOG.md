@@ -43,7 +43,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - issue and pull request templates
   - `.gitattributes` (Unity Smart Merge, binary types) and `.editorconfig`
 
+- **M2 (in progress): room mapping and saved rooms.**
+  - `RoomMappingFlow` in the session's Space step:
+    - a known room loads silently;
+    - a room the platform already knows is saved automatically;
+    - an unmapped room gets a briefing with an auto-start countdown, then Space Setup (Quest) or a guided look-around, then an automatic save.
+  - `RoomSnapshot`, `SpaceSignature`, `SpaceMatcher`, `SpaceLibrary` and `WalkableArea` (floor inside the walls, minus a 0.3 m margin).
+  - `CoverageTracker`, `PromptPanel`, `WorldUi` and `WalkableAreaView`.
+  - Device panel: **Rescan room**, **Forget room**, **Show area**, plus a room status line.
+  - Room tracking pauses once the room is mapped.
+  - Automation commands: `invoke rescan|forget|showarea|scandone|scanskip`, `prompt primary|secondary`, `turn <deg> <s>`.
+
 ### Fixed
+- Shapes created at runtime (anchor marker, panel grab bar, walkable-area outline) rendered pink on device. They now use a bundled URP Unlit material (`ImmersiveXRuntime.mat`), referenced from the settings asset so it's always in the build.
+- The walkable-area outline was drawn in the wrong place on Quest. On see-through and room-aware platforms the session now zeroes the rig's camera height offset, so the camera and the room's planes share one space. The outline follows the XR Origin's trackables.
+- XR Simulation showed a flat yellow background. The baseline now adds AR Foundation's **AR Background** URP renderer feature.
+- Play mode waited 10 s for head tracking in XR Simulation. Tracking is now also confirmed by `ARSession.state`.
 - Quest passthrough didn't draw. The configurator now enables the Meta Quest OpenXR feature set, including its required Composition Layers Support, and `Validate()` reports if it's off.
 - Quest wasn't detected on device. `MetaQuestAdapter` now recognises the running Meta session and logs why when it doesn't.
 - Room scanning no longer starts on platforms without room data.

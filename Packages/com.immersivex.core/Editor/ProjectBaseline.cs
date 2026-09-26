@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.XR.ARFoundation;
 
 namespace ImmersiveX.Editor
 {
@@ -24,6 +25,7 @@ namespace ImmersiveX.Editor
         const string PipelinePath = RenderingFolder + "/ImmersiveX_URP.asset";
         const string RendererPath = RenderingFolder + "/ImmersiveX_Renderer.asset";
         const string SettingsPath = "Assets/Settings/Resources/ImmersiveXSettings.asset";
+        const string RuntimeMaterialPath = "Packages/com.immersivex.core/Runtime/Materials/ImmersiveXRuntime.mat";
 
         const string EditorSimulationLoader = "UnityEngine.XR.Simulation.SimulationLoader";
 
@@ -42,6 +44,7 @@ namespace ImmersiveX.Editor
 
             UseInputSystemOnly();
             EnsureSettingsAsset();
+            EnsureRuntimeMaterial();
 
             // Play mode in the editor runs on AR Foundation's XR Simulation (see docs/spikes/S4).
             XrLoaderSetup.UseOnlyLoader(BuildTargetGroup.Standalone, EditorSimulationLoader);
@@ -60,6 +63,8 @@ namespace ImmersiveX.Editor
                 renderer = ScriptableObject.CreateInstance<UniversalRendererData>();
                 AssetDatabase.CreateAsset(renderer, RendererPath);
             }
+
+            EnsureArBackgroundFeature(renderer);
 
             var pipeline = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PipelinePath);
             if (pipeline != null)
@@ -81,12 +86,63 @@ namespace ImmersiveX.Editor
             return pipeline;
         }
 
+        /// <summary>
+        /// AR Foundation draws camera backgrounds (phones, XR Simulation's simulated room) through this URP feature.
+        /// It does nothing when no AR Camera Background is active, e.g. on Quest.
+        /// </summary>
+        static void EnsureArBackgroundFeature(UniversalRendererData renderer)
+        {
+            if (renderer.rendererFeatures.Exists(feature => feature is ARBackgroundRendererFeature))
+                return;
+
+            var background = ScriptableObject.CreateInstance<ARBackgroundRendererFeature>();
+            background.name = "AR Background";
+            AssetDatabase.AddObjectToAsset(background, renderer);
+            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(background, out _, out long localId);
+
+            var serialized = new SerializedObject(renderer);
+            var features = serialized.FindProperty("m_RendererFeatures");
+            var map = serialized.FindProperty("m_RendererFeatureMap");
+            features.arraySize++;
+            features.GetArrayElementAtIndex(features.arraySize - 1).objectReferenceValue = background;
+            map.arraySize++;
+            map.GetArrayElementAtIndex(map.arraySize - 1).longValue = localId;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(renderer);
+            Debug.Log("[ImmersiveX] Added the AR Background renderer feature to the URP renderer.");
+        }
+
         static void EnsureSettingsAsset()
         {
             if (AssetDatabase.LoadAssetAtPath<ImmersiveXSettings>(SettingsPath) != null)
                 return;
             EnsureFolder(Path.GetDirectoryName(SettingsPath)?.Replace('\\', '/'));
             AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<ImmersiveXSettings>(), SettingsPath);
+        }
+
+        /// <summary>
+        /// A URP Unlit material for shapes created at runtime. Referenced from the settings asset (in Resources),
+        /// so it and its shader are always part of the build; without it runtime shapes render pink on devices.
+        /// </summary>
+        static void EnsureRuntimeMaterial()
+        {
+            var material = AssetDatabase.LoadAssetAtPath<Material>(RuntimeMaterialPath);
+            if (material == null)
+            {
+                material = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { name = "ImmersiveXRuntime" };
+                AssetDatabase.CreateAsset(material, RuntimeMaterialPath);
+            }
+
+            var settings = AssetDatabase.LoadAssetAtPath<ImmersiveXSettings>(SettingsPath);
+            if (settings == null)
+                return;
+            var serialized = new SerializedObject(settings);
+            var reference = serialized.FindProperty("_runtimeMaterial");
+            if (reference.objectReferenceValue == null)
+            {
+                reference.objectReferenceValue = material;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
         }
 
         static void UseInputSystemOnly()

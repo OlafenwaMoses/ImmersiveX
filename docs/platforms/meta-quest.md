@@ -72,6 +72,18 @@ Everything marked ❌ is checked on the headset.
 2. Passthrough comes on and the boundary is hidden.
 3. Once the headset is on and tracking, the **Hello Hologram** cube appears about 80 cm in front of you, with the **Device check** panel on your left.
 
+## Room mapping (M2)
+- **Room Quest already knows** (Space Setup done): ImmersiveX saves it automatically on first launch. A short "Room saved" note appears, and the walkable area is outlined on the floor for 6 s.
+- **Known room:** loaded silently, with no prompt.
+- **Unmapped room:** a short briefing that starts Space Setup by itself after 5 s (or tap **Start now** / **Skip**). When Space Setup returns, the room is saved automatically.
+- **Walkable area** = floor inside the walls, minus a 0.3 m margin. Furniture isn't subtracted.
+- **Classification** (floor, walls, furniture) comes from Quest's Space Setup labels. ImmersiveX runs no ML model; it does light geometry once, then pauses room tracking.
+- **Panel buttons:**
+  - **Rescan room** runs Space Setup and updates the room.
+  - **Forget room** deletes ImmersiveX's saved copy; Quest's own Space Setup is untouched.
+  - **Show area** redraws the outline.
+- Saved rooms live in `Android/data/genxr.immersivex.app/files/ImmersiveX/spaces/`.
+
 ## Device checklist
 | Check | How | Expected |
 |---|---|---|

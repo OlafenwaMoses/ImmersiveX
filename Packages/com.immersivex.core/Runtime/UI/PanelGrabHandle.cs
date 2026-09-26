@@ -25,6 +25,7 @@ namespace ImmersiveX
 
         XRGrabInteractable _grab;
         Renderer _barRenderer;
+        Material _barMaterial;
         bool _built;
 
         /// <summary>Add a grab bar to <paramref name="panel"/>, whose visible size is <paramref name="panelSizeMetres"/>.</summary>
@@ -55,7 +56,9 @@ namespace ImmersiveX
             bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
             bar.transform.localScale = new Vector3(0.014f, _panelSize.x * 0.22f, 0.014f);
             _barRenderer = bar.GetComponent<Renderer>();
-            _barRenderer.material.color = Idle;
+            _barMaterial = RuntimeMaterials.Create(Idle);
+            _barRenderer.sharedMaterial = _barMaterial;
+            _barRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
             var grabZone = new GameObject("Grab Zone").AddComponent<BoxCollider>();
             grabZone.transform.SetParent(transform, false);
@@ -76,9 +79,15 @@ namespace ImmersiveX
             _grab.throwOnDetach = false;
             _grab.trackRotation = false; // we keep it upright and facing the user instead
             _grab.useDynamicAttach = true;
-            _grab.hoverEntered.AddListener(_ => _barRenderer.material.color = Hover);
-            _grab.hoverExited.AddListener(_ => _barRenderer.material.color = _grab.isSelected ? Hover : Idle);
-            _grab.selectExited.AddListener(_ => _barRenderer.material.color = Idle);
+            _grab.hoverEntered.AddListener(_ => _barMaterial.color = Hover);
+            _grab.hoverExited.AddListener(_ => _barMaterial.color = _grab.isSelected ? Hover : Idle);
+            _grab.selectExited.AddListener(_ => _barMaterial.color = Idle);
+        }
+
+        void OnDestroy()
+        {
+            if (_barMaterial != null)
+                Destroy(_barMaterial);
         }
 
         void LateUpdate()
