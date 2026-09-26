@@ -1,0 +1,35 @@
+name: Platform support request
+description: Ask for (or offer to build) an adapter for another device.
+labels: ["platform"]
+body:
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: "e.g. Pico 4 Ultra"
+    validations:
+      required: true
+  - type: textarea
+    id: sdk
+    attributes:
+      label: SDK and Unity support
+      description: Which Unity packages or vendor SDKs support this device, and for which Unity versions?
+    validations:
+      required: true
+  - type: checkboxes
+    id: capabilities
+    attributes:
+      label: Capabilities you know it has
+      options:
+        - label: Video passthrough
+        - label: Optical see-through
+        - label: Plane / room detection
+        - label: Persistent anchors
+        - label: Hand tracking
+        - label: Controllers
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contribution
+      options:
+        - label: I can build and test the adapter using `Platforms/_Template`

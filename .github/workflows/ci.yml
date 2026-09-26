@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  repo-checks:
+    name: Repository checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Meta files, JSON and generated folders
+        run: python3 tools/ci/check_repo.py
+
+  unity-editmode:
+    name: Unity EditMode tests
+    needs: repo-checks
+    runs-on: ubuntu-latest
+    # Runs only when the Unity licence secrets are configured (see CONTRIBUTING.md → "CI").
+    env:
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+    steps:
+      - name: Skip without Unity licence
+        if: env.UNITY_LICENSE == ''
+        run: echo "::notice::Unity licence secrets are not set, so Unity tests were skipped. See CONTRIBUTING.md → CI."
+
+      - uses: actions/checkout@v4
+        if: env.UNITY_LICENSE != ''
+
+      - name: Cache Library
+        if: env.UNITY_LICENSE != ''
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: Library-${{ runner.os }}-
+
+      - name: Run EditMode tests
+        if: env.UNITY_LICENSE != ''
+        uses: game-ci/unity-test-runner@v4
+        with:
+          testMode: editmode
+          artifactsPath: test-results
+
+      - name: Upload test results
+        if: always() && env.UNITY_LICENSE != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: editmode-test-results
+          path: test-results

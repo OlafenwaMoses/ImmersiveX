@@ -1,0 +1,16 @@
+{
+  "name": "ImmersiveX.Platforms.Template",
+  "rootNamespace": "ImmersiveX.Platforms.Template",
+  "references": [
+    "ImmersiveX.Core"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,0 +1,46 @@
+{
+  "id": "metaquest",
+  "displayName": "Meta Quest",
+  "status": "preview",
+  "package": "com.immersivex.platform.metaquest",
+  "summary": "Quest 3 / 3S (full mixed reality) and Quest Pro / 2. Passthrough, Space Setup, persistent anchors, hands and controllers.",
+  "docs": "docs/platforms/meta-quest.md",
+  "devices": ["Quest 3", "Quest 3S", "Quest Pro", "Quest 2"],
+  "unity": {
+    "minimum": "6000.3.23f1",
+    "tested": ["6000.3.23f1"],
+    "modules": ["Android Build Support", "Android SDK & NDK Tools", "OpenJDK"]
+  },
+  "build": {
+    "target": "Android",
+    "scriptingBackend": "IL2CPP",
+    "architectures": ["ARM64"],
+    "graphicsApis": ["Vulkan"],
+    "androidMinSdk": 32,
+    "androidTargetSdk": 34,
+    "textureCompression": "ASTC",
+    "output": "Builds/metaquest/ImmersiveX.apk"
+  },
+  "packages": {
+    "com.unity.xr.openxr": "1.18.0",
+    "com.unity.xr.meta-openxr": "2.3.2"
+  },
+  "openxrFeatures": [
+    "Meta Quest Support",
+    "Meta Quest: Session, Camera (Passthrough), Planes, Bounding Boxes, Anchors, Raycasts",
+    "Meta Quest: Boundary Visibility (ImmersiveX hides the boundary once passthrough is showing)",
+    "Hand Tracking Subsystem, Meta Hand Tracking Aim",
+    "Oculus Touch, Meta Quest Touch Plus and Hand Interaction profiles"
+  ],
+  "permissions": [
+    "com.oculus.permission.USE_SCENE (runtime; requested at start)",
+    "com.oculus.permission.USE_ANCHOR_API",
+    "com.oculus.permission.BOUNDARY_VISIBILITY",
+    "com.oculus.permission.HAND_TRACKING"
+  ],
+  "device": {
+    "testedOs": "Horizon OS v207 (Android 14)",
+    "requires": ["Developer Mode on (Meta Horizon app)", "USB debugging allowed in the headset"]
+  },
+  "accounts": ["Meta developer account (organisation) to turn on Developer Mode"]
+}

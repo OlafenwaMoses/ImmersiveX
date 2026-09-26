@@ -1,0 +1,18 @@
+{
+  "name": "com.immersivex.platform.metaquest",
+  "version": "0.1.0",
+  "displayName": "ImmersiveX · Meta Quest",
+  "description": "ImmersiveX platform adapter for Meta Quest 3, 3S, Pro and 2: passthrough, Space Setup room data, persistent anchors, boundary suppression, hands and controllers. Pins the tested Unity OpenXR: Meta and OpenXR versions.",
+  "unity": "6000.3",
+  "unityRelease": "23f1",
+  "license": "MIT",
+  "author": {
+    "name": "Moses Olafenwa",
+    "url": "https://github.com/OlafenwaMoses"
+  },
+  "dependencies": {
+    "com.immersivex.core": "0.1.0",
+    "com.unity.xr.openxr": "1.18.0",
+    "com.unity.xr.meta-openxr": "2.3.2"
+  }
+}

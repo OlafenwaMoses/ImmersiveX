@@ -1,0 +1,12 @@
+{
+  "name": "com.immersivex.platform.template",
+  "version": "0.1.0",
+  "displayName": "ImmersiveX · Template platform",
+  "description": "Starting point for a new ImmersiveX platform adapter. Copy this folder, then follow docs/adding-a-platform.md.",
+  "unity": "6000.3",
+  "unityRelease": "23f1",
+  "license": "MIT",
+  "dependencies": {
+    "com.immersivex.core": "0.1.0"
+  }
+}

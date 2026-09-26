@@ -1,0 +1,15 @@
+{
+  "id": "template",
+  "displayName": "Template platform",
+  "status": "template",
+  "package": "com.immersivex.platform.template",
+  "summary": "Copy this folder to start a new platform adapter.",
+  "docs": "docs/adding-a-platform.md",
+  "devices": [],
+  "unity": { "minimum": "6000.3.23f1", "tested": [], "modules": [] },
+  "build": { "target": "", "output": "" },
+  "packages": {},
+  "permissions": [],
+  "device": { "requires": [] },
+  "accounts": []
+}
