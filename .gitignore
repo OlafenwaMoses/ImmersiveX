@@ -104,3 +104,34 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# ---------------------------------------------------------------------------
+# ImmersiveX additions
+# ---------------------------------------------------------------------------
+
+# Operating system and IDE state
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Unity build side-products
+*_BackUpThisFolder_ButDontShipItWithYourGame/
+*_BurstDebugInformation_DoNotShip/
+*.aab
+.gradle-home/
+
+# Local credentials and signing keys (never commit these)
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+# The Meta developer-agent settings asset stores a personal access token.
+/[Aa]ssets/[Rr]esources/DevAgentSettings.asset
+/[Aa]ssets/[Rr]esources/DevAgentSettings.asset.meta
+
+# XR Simulation per-user preferences (chosen environment, navigation input); recreated automatically.
+/[Aa]ssets/XR/UserSimulationSettings/
+/[Aa]ssets/XR/UserSimulationSettings.meta

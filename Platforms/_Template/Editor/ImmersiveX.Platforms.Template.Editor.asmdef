@@ -1,0 +1,20 @@
+{
+  "name": "ImmersiveX.Platforms.Template.Editor",
+  "rootNamespace": "ImmersiveX.Platforms.Template.Editor",
+  "references": [
+    "ImmersiveX.Core",
+    "ImmersiveX.Core.Editor",
+    "ImmersiveX.Platforms.Template"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

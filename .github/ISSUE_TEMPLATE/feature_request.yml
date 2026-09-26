@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest an improvement to ImmersiveX.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the problem or the experience you want to build, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - F1 See-through view
+        - F2 Room mapping
+        - F3 Persistent anchors
+        - F4 Hands and controllers
+        - F5 Motion restrictions
+        - F6 Media dashboard
+        - F7 Gravity and physics
+        - F8 Transparency
+        - F9 Platform adapters
+        - F10 Dependency versions
+        - Documentation / samples
+        - Other
+    validations:
+      required: true

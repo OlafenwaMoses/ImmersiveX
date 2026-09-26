@@ -1,0 +1,24 @@
+{
+  "name": "ImmersiveX.Platforms.MetaQuest",
+  "rootNamespace": "ImmersiveX.Platforms.MetaQuest",
+  "references": [
+    "ImmersiveX.Core",
+    "Unity.XR.ARFoundation",
+    "Unity.XR.ARSubsystems",
+    "Unity.XR.OpenXR",
+    "Unity.XR.MetaOpenXR",
+    "Unity.XR.Management"
+  ],
+  "includePlatforms": [
+    "Android",
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

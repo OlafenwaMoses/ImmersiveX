@@ -1,0 +1,28 @@
+{
+  "name": "com.immersivex.core",
+  "version": "0.1.0",
+  "displayName": "ImmersiveX Core",
+  "description": "Platform-agnostic foundation for mixed, augmented and virtual reality apps: see-through view, room mapping, persistent anchors, hand and controller interaction, motion constraints, media dashboard, physics and appearance. Platform adapters live in separate packages.",
+  "unity": "6000.3",
+  "unityRelease": "23f1",
+  "license": "MIT",
+  "author": {
+    "name": "Moses Olafenwa",
+    "url": "https://github.com/OlafenwaMoses"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OlafenwaMoses/ImmersiveX.git"
+  },
+  "keywords": ["xr", "mixed reality", "augmented reality", "virtual reality", "passthrough", "anchors"],
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.3.0",
+    "com.unity.inputsystem": "1.20.0",
+    "com.unity.ugui": "2.0.0",
+    "com.unity.xr.core-utils": "2.6.0",
+    "com.unity.xr.management": "4.6.1",
+    "com.unity.xr.arfoundation": "6.3.5",
+    "com.unity.xr.interaction.toolkit": "3.3.2",
+    "com.unity.xr.hands": "1.7.3"
+  }
+}

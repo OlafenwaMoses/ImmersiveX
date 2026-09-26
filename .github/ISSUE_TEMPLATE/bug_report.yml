@@ -1,0 +1,53 @@
+name: Bug report
+description: Something doesn't work as documented.
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Meta Quest 3 / 3S
+        - Meta Quest Pro / 2
+        - Apple Vision Pro
+        - iPhone / iPad (ARKit)
+        - Android phone (ARCore)
+        - Android XR
+        - HoloLens 2
+        - Magic Leap 2
+        - PC VR (SteamVR / OpenXR)
+        - HTC VIVE
+        - Unity editor (XR Simulation)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Unity version, ImmersiveX version or commit, and device OS version.
+      placeholder: "Unity 6000.3.23f1 · ImmersiveX 0.1.0 (abc1234) · Horizon OS v…"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the Main scene
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant Console or `adb logcat -s Unity` output. It's formatted automatically.
+      render: text

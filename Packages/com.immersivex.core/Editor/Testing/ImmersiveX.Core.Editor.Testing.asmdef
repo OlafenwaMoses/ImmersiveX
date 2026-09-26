@@ -1,0 +1,29 @@
+{
+  "name": "ImmersiveX.Core.Editor.Testing",
+  "rootNamespace": "ImmersiveX.Editor",
+  "references": [
+    "ImmersiveX.Core",
+    "ImmersiveX.Core.Editor",
+    "UnityEditor.TestRunner",
+    "UnityEngine.TestRunner"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [
+    "IMMERSIVEX_TEST_FRAMEWORK"
+  ],
+  "versionDefines": [
+    {
+      "name": "com.unity.test-framework",
+      "expression": "1.0.0",
+      "define": "IMMERSIVEX_TEST_FRAMEWORK"
+    }
+  ],
+  "noEngineReferences": false
+}

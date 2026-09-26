@@ -1,0 +1,69 @@
+# Normalise line endings: store LF in the repository.
+* text=auto eol=lf
+
+# C# and project text files
+*.cs        text diff=csharp
+*.asmdef    text
+*.asmref    text
+*.json      text
+*.md        text
+*.yml       text
+*.yaml      text
+*.xml       text
+*.shader    text
+*.hlsl      text
+*.cginc     text
+*.shadergraph    text
+*.shadersubgraph text
+
+# Unity YAML: merge with UnityYAMLMerge (Smart Merge). See CONTRIBUTING.md to enable the driver.
+*.unity       text merge=unityyamlmerge
+*.prefab      text merge=unityyamlmerge
+*.asset       text merge=unityyamlmerge
+*.mat         text merge=unityyamlmerge
+*.anim        text merge=unityyamlmerge
+*.controller  text merge=unityyamlmerge
+*.overrideController text merge=unityyamlmerge
+*.physicMaterial     text merge=unityyamlmerge
+*.physicsMaterial2D  text merge=unityyamlmerge
+*.playable    text merge=unityyamlmerge
+*.mask        text merge=unityyamlmerge
+*.lighting    text merge=unityyamlmerge
+*.preset      text merge=unityyamlmerge
+*.meta        text merge=unityyamlmerge
+*.inputactions text
+
+# Binary assets: never diff or merge as text.
+# Git LFS is opt-in for this repo; CONTRIBUTING.md explains how to enable it in a fork.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.tga   binary
+*.tif   binary
+*.psd   binary
+*.exr   binary
+*.hdr   binary
+*.fbx   binary
+*.obj   binary
+*.glb   binary
+*.gltf  text
+*.blend binary
+*.wav   binary
+*.mp3   binary
+*.ogg   binary
+*.m4a   binary
+*.mp4   binary
+*.mov   binary
+*.webm  binary
+*.ttf   binary
+*.otf   binary
+*.bytes binary
+*.motion binary
+*.dll   binary
+*.so    binary
+*.aar   binary
+*.jar   binary
+*.a     binary
+*.bundle binary
+*.pdf   binary
+*.zip   binary
