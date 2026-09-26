@@ -14,3 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: ImmersiveX.Core::ImmersiveX.ImmersiveXSettings
   _defaultOpacity: 0.5
   _disableLocomotionInSeeThrough: 1
+  _runtimeMaterial: {fileID: 2100000, guid: ca762879eafd7475ebaac488d6bddbfc, type: 2}
+  _wallMargin: 0.3
+  _roomDataWaitSeconds: 4
+  _autoStartRoomScanSeconds: 5
+  _pauseRoomTrackingWhenMapped: 1
+  _scanMaxTurnSpeed: 60
+  _scanIdleSeconds: 3
+  _showWalkableAreaSeconds: 6

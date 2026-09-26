@@ -1,3 +1,4 @@
+using UnityEngine;
 using UnityEngine.XR.OpenXR;
 using UnityEngine.XR.OpenXR.Features.Meta;
 
@@ -34,7 +35,10 @@ namespace ImmersiveX.Platforms.MetaQuest
             var feature = Feature;
             if (feature == null || !feature.enabled)
             {
-                ImmersiveXLog.Warn("Boundary Visibility feature isn't enabled; the boundary stays visible. Run Configure in Platform Setup.");
+                if (Application.isEditor)
+                    ImmersiveXLog.Info("Boundary hiding isn't available in the editor simulators.");
+                else
+                    ImmersiveXLog.Warn("Boundary Visibility feature isn't enabled; the boundary stays visible. Run Configure in Platform Setup.");
                 return;
             }
 

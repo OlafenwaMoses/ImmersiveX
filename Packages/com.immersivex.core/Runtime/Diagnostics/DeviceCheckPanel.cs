@@ -1,20 +1,17 @@
 using System;
 using System.Text;
 using UnityEngine;
-using UnityEngine.Events;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
-using UnityEngine.XR.Interaction.Toolkit.UI;
 
 namespace ImmersiveX.Diagnostics
 {
     /// <summary>
-    /// A world-space panel for checking ImmersiveX on a device: platform, see-through, boundary, room data,
-    /// anchors and frame rate. Its buttons run the headset checks from spikes S1–S3:
-    /// start the system room scan, and save / load / erase a persistent anchor.
-    /// Drop it into any ImmersiveX scene; it builds its own UI and places itself to the user's left.
+    /// A world-space panel for checking ImmersiveX on a device: platform, see-through, boundary, room, anchors and
+    /// frame rate. Its buttons rescan, forget or show the mapped room, and save / load / erase a persistent test anchor.
+    /// Drop it into any ImmersiveX scene; it builds its own UI, places itself to the user's left, and can be moved
+    /// with the grab bar underneath.
     /// </summary>
     [AddComponentMenu("ImmersiveX/Diagnostics/Device Check Panel")]
     public sealed class DeviceCheckPanel : MonoBehaviour
@@ -22,44 +19,36 @@ namespace ImmersiveX.Diagnostics
         const string SavedAnchorKey = "ImmersiveX.DeviceCheck.AnchorId";
         const float RefreshSeconds = 0.25f;
         const float Width = 520f;
-        const float Height = 660f;
+        const float Height = 760f;
 
         [SerializeField, Tooltip("Metres from the user: X to the right, Y up from eye height, Z forward.")]
-        Vector3 _offsetFromUser = new Vector3(-0.55f, -0.05f, 0.75f);
+        Vector3 _offsetFromUser = new Vector3(-0.6f, -0.05f, 0.75f);
 
         [SerializeField, Tooltip("Object whose pose is saved as the test anchor. Defaults to the first ImmersiveContent in the scene.")]
         Transform _anchorSubject;
 
         ImmersiveXSession _session;
-        Font _font;
         Text _status;
         Text _messages;
         GameObject _marker;
         string _anchorText = "Anchor: none saved yet.";
-        string _spaceText = "Space Setup: not requested.";
-        bool _spaceSetupRequested;
         float _fps;
         float _nextRefresh;
 
         string AnchorMessage
         {
-            set { _anchorText = value; ImmersiveXLog.Info("Device check · " + value); }
+            set
+            {
+                _anchorText = value;
+                ImmersiveXLog.Info("Device check · " + value);
+            }
         }
-
-        string SpaceMessage
-        {
-            set { _spaceText = value; ImmersiveXLog.Info("Device check · " + value); }
-        }
-
-        static string Describe(XRResultStatus status) => $"{status.statusCode}, native code {status.nativeStatusCode}";
 
         void Start()
         {
             _session = ImmersiveXSession.Instance;
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            EnsureEventSystem();
             BuildUi();
-            PanelGrabHandle.Attach(gameObject, new Vector2(Width, Height) * 0.001f); // grab the bar underneath to move the panel
+            PanelGrabHandle.Attach(gameObject, new Vector2(Width, Height) * 0.001f);
             if (_session != null)
                 _session.StateChanged += OnSessionStateChanged;
         }
@@ -68,17 +57,6 @@ namespace ImmersiveX.Diagnostics
         {
             if (_session != null)
                 _session.StateChanged -= OnSessionStateChanged;
-        }
-
-        void OnApplicationPause(bool paused)
-        {
-            // Space Setup pauses the app and resumes it when the user is done (spike S1).
-            // Other pauses (headset off, Quest menu) aren't Space Setup, so they aren't reported here.
-            if (paused || !_spaceSetupRequested)
-                return;
-
-            _spaceSetupRequested = false;
-            SpaceMessage = "Space Setup: finished; the app is back.";
         }
 
         void Update()
@@ -90,7 +68,7 @@ namespace ImmersiveX.Diagnostics
                 return;
             _nextRefresh = Time.unscaledTime + RefreshSeconds;
             _status.text = BuildStatus();
-            _messages.text = _spaceText + "\n" + _anchorText;
+            _messages.text = _anchorText;
         }
 
         void OnSessionStateChanged(SessionState state)
@@ -105,15 +83,15 @@ namespace ImmersiveX.Diagnostics
             transform.SetPositionAndRotation(pose.position, Quaternion.LookRotation(fromUser.normalized, Vector3.up));
 
             if (PlayerPrefs.HasKey(SavedAnchorKey))
-                LoadAnchor(); // restore automatically after a restart (spike S2)
+                LoadAnchor(); // restore automatically after a restart
         }
 
         string BuildStatus()
         {
-            var text = new StringBuilder();
             if (_session == null)
                 return "No ImmersiveX Session in the scene.";
 
+            var text = new StringBuilder();
             var platform = _session.Platform;
             text.AppendLine($"Platform:  {platform?.DisplayName ?? "resolving…"}");
             text.AppendLine($"Session:  {_session.State}");
@@ -125,41 +103,43 @@ namespace ImmersiveX.Diagnostics
                 text.AppendLine($"Anchors:  {platform.Capabilities.Anchors}");
             }
 
-            text.AppendLine($"Room access:  {(_session.HasRoomAccess ? "granted" : "not granted")}");
-            if (_session.Origin != null)
-            {
-                var planes = _session.Origin.GetComponent<ARPlaneManager>();
-                var boxes = _session.Origin.GetComponent<ARBoundingBoxManager>();
-                var planeCount = Count(planes, planes != null ? planes.trackables.count : 0);
-                var boxCount = Count(boxes, boxes != null ? boxes.trackables.count : 0);
-                text.AppendLine($"Room data:  {planeCount} planes · {boxCount} boxes");
-            }
-
+            text.AppendLine($"Room:  {_session.RoomStatus}");
+            if (_session.CurrentSpace != null)
+                text.AppendLine($"Room data:  {RoomSummary()}");
             text.Append($"Frame rate:  {_fps:0} fps");
             return text.ToString();
         }
 
-        static string Count(Behaviour manager, int count) =>
-            manager != null && manager.enabled ? count.ToString() : "–";
-
-        // ---------------------------------------------------------------- S1: system room scan
-
-        /// <summary>Same as pressing the panel button.</summary>
-        public void RunSpaceSetup()
+        string RoomSummary()
         {
-            if (!Services.TryGet<ISpaceProvider>(out var space) || !space.CanRequestSystemScan)
-            {
-                SpaceMessage = "Space Setup: this platform has no system room scan.";
-                return;
-            }
-
-            _spaceSetupRequested = space.RequestSystemScan();
-            SpaceMessage = _spaceSetupRequested
-                ? "Space Setup: requested. The app pauses until you finish."
-                : "Space Setup: the request was refused.";
+            var planes = _session.Origin != null ? _session.Origin.GetComponent<ARPlaneManager>() : null;
+            var tracking = planes != null && planes.enabled ? "tracking" : "tracking paused";
+            var signature = _session.CurrentSpace.Signature;
+            var walls = signature?.WallLengths?.Length ?? 0;
+            return $"{signature?.FloorArea ?? 0f:0.0} m² floor · {walls} walls · {tracking}";
         }
 
-        // ---------------------------------------------------------------- S2: persistent anchors
+        // ---------------------------------------------------------------- Room
+
+        /// <summary>Same as pressing the panel button.</summary>
+        public void RescanRoom()
+        {
+            if (_session == null)
+                return;
+            ImmersiveXLog.Info("Device check · Rescan room requested.");
+            _session.RescanRoom();
+        }
+
+        /// <summary>Same as pressing the panel button.</summary>
+        public void ForgetRoom() => _session?.ForgetRoom();
+
+        /// <summary>Same as pressing the panel button.</summary>
+        public void ShowWalkableArea() => _session?.ShowWalkableArea();
+
+        /// <summary>Kept for automation scripts written before M2: same as <see cref="RescanRoom"/>.</summary>
+        public void RunSpaceSetup() => RescanRoom();
+
+        // ---------------------------------------------------------------- Persistent anchors
 
         /// <summary>Same as pressing the panel button.</summary>
         public async void SaveAnchor()
@@ -269,6 +249,8 @@ namespace ImmersiveX.Diagnostics
 
         static string Short(SerializableGuid id) => id.guid.ToString("N").Substring(0, 8);
 
+        static string Describe(XRResultStatus status) => $"{status.statusCode}, native code {status.nativeStatusCode}";
+
         void ShowMarker(Transform anchor)
         {
             if (_marker == null)
@@ -277,7 +259,7 @@ namespace ImmersiveX.Diagnostics
                 _marker.name = "Anchor Marker";
                 Destroy(_marker.GetComponent<Collider>());
                 _marker.transform.localScale = Vector3.one * 0.06f;
-                _marker.GetComponent<Renderer>().material.color = new Color(0.25f, 0.6f, 1f);
+                _marker.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Create(new Color(0.25f, 0.6f, 1f));
             }
 
             _marker.transform.SetParent(anchor, false);
@@ -286,71 +268,25 @@ namespace ImmersiveX.Diagnostics
 
         // ---------------------------------------------------------------- UI
 
-        static void EnsureEventSystem()
-        {
-            if (FindAnyObjectByType<EventSystem>() == null)
-                new GameObject("EventSystem", typeof(EventSystem), typeof(XRUIInputModule));
-        }
-
         void BuildUi()
         {
-            var canvasObject = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas), typeof(TrackedDeviceGraphicRaycaster));
-            canvasObject.transform.SetParent(transform, false);
-            canvasObject.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
-            var root = (RectTransform)canvasObject.transform;
-            root.sizeDelta = new Vector2(Width, Height);
-            root.localScale = Vector3.one * 0.001f; // 1 UI unit = 1 mm
+            var root = WorldUi.CreateCanvas(transform, new Vector2(Width, Height));
+            WorldUi.Label(root, "Title", "ImmersiveX · Device check", 30, new Vector2(0f, 345f), new Vector2(Width - 40f, 44f), FontStyle.Bold);
+            _status = WorldUi.Label(root, "Status", string.Empty, 22, new Vector2(0f, 165f), new Vector2(Width - 40f, 300f));
+            _messages = WorldUi.Label(root, "Messages", string.Empty, 19, new Vector2(0f, -35f), new Vector2(Width - 40f, 70f), FontStyle.Italic);
 
-            var background = Box(root, "Background", Vector2.zero, new Vector2(Width, Height)).gameObject.AddComponent<Image>();
-            background.color = new Color(0.05f, 0.1f, 0.18f, 0.92f);
+            WorldUi.Label(root, "Room heading", "Room", 18, new Vector2(0f, -85f), new Vector2(Width - 40f, 26f), FontStyle.Bold);
+            WorldUi.Button(root, "Rescan room", new Vector2(-165f, -130f), new Vector2(150f, 56f), RescanRoom);
+            WorldUi.Button(root, "Forget room", new Vector2(0f, -130f), new Vector2(150f, 56f), ForgetRoom);
+            WorldUi.Button(root, "Show area", new Vector2(165f, -130f), new Vector2(150f, 56f), ShowWalkableArea);
 
-            Label(root, "Title", "ImmersiveX · Device check", 30, new Vector2(0f, 290f), new Vector2(Width - 40f, 44f), FontStyle.Bold);
-            _status = Label(root, "Status", string.Empty, 22, new Vector2(0f, 120f), new Vector2(Width - 40f, 270f), FontStyle.Normal);
-            _messages = Label(root, "Messages", string.Empty, 19, new Vector2(0f, -70f), new Vector2(Width - 40f, 100f), FontStyle.Italic);
+            WorldUi.Label(root, "Anchor heading", "Anchor", 18, new Vector2(0f, -185f), new Vector2(Width - 40f, 26f), FontStyle.Bold);
+            WorldUi.Button(root, "Save anchor", new Vector2(-165f, -230f), new Vector2(150f, 56f), SaveAnchor);
+            WorldUi.Button(root, "Load anchor", new Vector2(0f, -230f), new Vector2(150f, 56f), LoadAnchor);
+            WorldUi.Button(root, "Erase anchor", new Vector2(165f, -230f), new Vector2(150f, 56f), EraseAnchor);
 
-            Button(root, "Run Space Setup", new Vector2(0f, -150f), new Vector2(Width - 40f, 56f), RunSpaceSetup);
-            Button(root, "Save anchor", new Vector2(-165f, -225f), new Vector2(150f, 56f), SaveAnchor);
-            Button(root, "Load anchor", new Vector2(0f, -225f), new Vector2(150f, 56f), LoadAnchor);
-            Button(root, "Erase anchor", new Vector2(165f, -225f), new Vector2(150f, 56f), EraseAnchor);
-            Label(root, "Hint", "Grab the cube with a hand or controller. Point and pull the trigger (or pinch) to press buttons. Grab the bar below to move this panel.",
-                16, new Vector2(0f, -295f), new Vector2(Width - 40f, 44f), FontStyle.Normal);
-        }
-
-        static RectTransform Box(Transform parent, string name, Vector2 position, Vector2 size)
-        {
-            var rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
-            rect.SetParent(parent, false);
-            rect.anchoredPosition = position;
-            rect.sizeDelta = size;
-            return rect;
-        }
-
-        Text Label(Transform parent, string name, string value, int fontSize, Vector2 position, Vector2 size, FontStyle style)
-        {
-            var text = Box(parent, name, position, size).gameObject.AddComponent<Text>();
-            text.font = _font;
-            text.text = value;
-            text.fontSize = fontSize;
-            text.fontStyle = style;
-            text.color = new Color(0.92f, 0.95f, 1f);
-            text.alignment = TextAnchor.UpperLeft;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Truncate;
-            text.raycastTarget = false;
-            return text;
-        }
-
-        void Button(Transform parent, string label, Vector2 position, Vector2 size, UnityAction onClick)
-        {
-            var rect = Box(parent, label, position, size);
-            var image = rect.gameObject.AddComponent<Image>();
-            image.color = new Color(0.16f, 0.42f, 0.8f);
-            var button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(onClick);
-
-            var text = Label(rect, "Label", label, 20, Vector2.zero, size, FontStyle.Bold);
-            text.alignment = TextAnchor.MiddleCenter;
+            WorldUi.Label(root, "Hint", "Grab the cube with a hand or controller. Point and pull the trigger (or pinch) to press buttons. " +
+                                      "Grab the bar below to move this panel.", 16, new Vector2(0f, -320f), new Vector2(Width - 40f, 60f));
         }
     }
 }

@@ -17,7 +17,10 @@ namespace ImmersiveX.Editor
     /// <list type="bullet">
     /// <item><c>refresh</c>: import changed files and recompile · <c>test [editmode|playmode]</c>: run the Unity tests</item>
     /// <item><c>play [seconds]</c>: enter Play mode, record the log, take a screenshot, stop after the given time (default 20; 0 = keep playing until <c>stop</c>)</item>
-    /// <item><c>capture</c>: screenshot the Game view now · <c>invoke spacesetup|saveanchor|loadanchor|eraseanchor</c>: press a Device Check button</item>
+    /// <item><c>capture</c>: screenshot the Game view now</item>
+    /// <item><c>invoke rescan|forget|showarea|saveanchor|loadanchor|eraseanchor|scandone|scanskip</c>: press a Device Check or scan button</item>
+    /// <item><c>prompt primary|secondary</c>: press a button on the ImmersiveX prompt that's showing</item>
+    /// <item><c>turn &lt;degrees&gt; &lt;seconds&gt;</c>: turn the rig on the spot (Play mode) to test the guided look-around's coverage and coaching</item>
     /// <item><c>stop</c>: leave Play mode</item>
     /// <item><c>playmode xr-simulation|metaquest-simulator</c>: choose the Play-mode runtime</item>
     /// <item><c>configure &lt;platform&gt;</c>, <c>build &lt;platform&gt;</c>, <c>buildrun &lt;platform&gt;</c>: Platform Setup actions</item>
@@ -44,6 +47,9 @@ namespace ImmersiveX.Editor
         internal static System.Action<string, System.Action<string, string>> TestRunner;
 
         static readonly object LogLock = new object();
+        static float _turnRemaining;
+        static float _turnSpeed;
+        static double _lastTurnTime;
         static int _errors;
         static int _warnings;
 
@@ -59,6 +65,7 @@ namespace ImmersiveX.Editor
         {
             if (UnityEditor.SessionState.GetBool(PlayRunKey, false))
                 AdvancePlayRun();
+            AdvanceTurn();
 
             if (!File.Exists(CommandFile) || EditorApplication.isCompiling || EditorApplication.isUpdating)
                 return;
@@ -103,6 +110,19 @@ namespace ImmersiveX.Editor
                     break;
                 case "invoke":
                     Invoke(command, argument);
+                    break;
+                case "prompt":
+                    var prompt = PromptPanel.Active;
+                    if (prompt == null)
+                        throw new InvalidOperationException("No ImmersiveX prompt is showing.");
+                    if (argument == "secondary")
+                        prompt.PressSecondary();
+                    else
+                        prompt.PressPrimary();
+                    WriteResult(command, "ok", $"Pressed the {(argument == "secondary" ? "secondary" : "primary")} button.");
+                    break;
+                case "turn":
+                    StartTurn(command, argument);
                     break;
                 case "stop":
                     UnityEditor.SessionState.SetBool(PlayRunKey, false);
@@ -155,14 +175,56 @@ namespace ImmersiveX.Editor
 
             switch (action)
             {
-                case "spacesetup": panel.RunSpaceSetup(); break;
+                case "rescan":
+                case "spacesetup": panel.RescanRoom(); break;
+                case "forget": panel.ForgetRoom(); break;
+                case "showarea": panel.ShowWalkableArea(); break;
+                case "scandone": ImmersiveXSession.Instance?.FinishGuidedScan(); break;
+                case "scanskip": ImmersiveXSession.Instance?.SkipGuidedScan(); break;
                 case "saveanchor": panel.SaveAnchor(); break;
                 case "loadanchor": panel.LoadAnchor(); break;
                 case "eraseanchor": panel.EraseAnchor(); break;
                 default: throw new ArgumentException($"Unknown action '{action}'.");
             }
 
-            WriteResult(command, "ok", $"Invoked {action}. Session: {ImmersiveXSession.Instance?.State}");
+            WriteResult(command, "ok", $"Invoked {action}. Session: {ImmersiveXSession.Instance?.State}. Room: {ImmersiveXSession.Instance?.RoomStatus}");
+        }
+
+        static void StartTurn(string command, string argument)
+        {
+            if (!EditorApplication.isPlaying || ImmersiveXSession.Instance == null || ImmersiveXSession.Instance.Origin == null)
+                throw new InvalidOperationException("Turning needs Play mode with an ImmersiveX Session.");
+            var parts = argument.Split(' ');
+            if (parts.Length < 2 || !float.TryParse(parts[0], out var degrees) || !float.TryParse(parts[1], out var seconds) || seconds <= 0f)
+                throw new ArgumentException("Usage: turn <degrees> <seconds>");
+            _turnRemaining = degrees;
+            _turnSpeed = degrees / seconds;
+            _lastTurnTime = EditorApplication.timeSinceStartup;
+            WriteResult(command, "ok", $"Turning {degrees:0}° over {seconds:0.#}s.");
+        }
+
+        static void AdvanceTurn()
+        {
+            if (Mathf.Approximately(_turnRemaining, 0f))
+                return;
+            var session = ImmersiveXSession.Instance;
+            if (!EditorApplication.isPlaying || session == null || session.Origin == null)
+            {
+                _turnRemaining = 0f;
+                return;
+            }
+
+            var now = EditorApplication.timeSinceStartup;
+            var step = _turnSpeed * (float)(now - _lastTurnTime);
+            _lastTurnTime = now;
+            if (Mathf.Abs(step) > Mathf.Abs(_turnRemaining))
+                step = _turnRemaining;
+            _turnRemaining -= step;
+
+            // Turn the rig around the user's head, as if they turned on the spot. This exercises the guided
+            // look-around (coverage, coaching, prompt follow). XR Simulation's simulated room scanner only follows
+            // the simulated device, which is moved with the mouse and keyboard in the Game view.
+            session.Origin.transform.RotateAround(session.Origin.Camera.transform.position, Vector3.up, step);
         }
 
         // ---------------------------------------------------------------- Play-mode runs
