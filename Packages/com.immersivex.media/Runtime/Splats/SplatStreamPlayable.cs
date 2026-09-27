@@ -9,7 +9,7 @@ namespace ImmersiveX.Media
     /// A GenXR 3.5D hologram stream: <c>stream.json</c> plus one file per frame per quality tier, and a soundtrack.
     /// Frames stream into a few seconds of buffer (waiting, like a video player, when it runs dry); the soundtrack is the
     /// clock. Every frame is fitted to the media's height with its feet on the floor; the fit glides within a shot and
-    /// jumps at camera cuts.
+    /// jumps at camera cuts. A stream with one fit for the whole clip (a 4D capture of one character) keeps that fit.
     /// </summary>
     sealed class SplatStreamPlayable : IMediaPlayable
     {
@@ -107,10 +107,15 @@ namespace ImmersiveX.Media
             _order = new uint[_tier.MaxCount];
             if (!string.IsNullOrEmpty(_manifest.AudioUrl))
                 _audio = StreamAudio.Open(_manifest.AudioUrl, Loop, context.Host);
+            if (_manifest.Fit.HasValue)
+            {
+                _fitShown = _fitTarget = _manifest.Fit.Value;
+                _hasFit = true;
+            }
 
             ImmersiveXLog.Info($"Hologram: {_manifest.FrameCount} frames at {_manifest.Fps:0.##} fps ({MediaControls.FormatTime(Duration)}) · " +
                                $"{_tier.Name} quality, up to {_tier.MaxCount:N0} Gaussians · needs {_tier.RateMegabytesPerSecond:0.#} MB/s · " +
-                               $"{context.ParallelDownloads} parallel downloads");
+                               $"{context.ParallelDownloads} parallel downloads · {(_manifest.Fit.HasValue ? "one fit for the clip" : "fitted per frame")}");
         }
 
         public void Play()
@@ -260,6 +265,9 @@ namespace ImmersiveX.Media
                 return; // an empty frame (the source has a few): nothing to draw, keep the current fit
 
             HologramFrame.DecodePositions(data, header, _positions);
+            if (_manifest.Fit.HasValue)
+                return; // one fit for the whole clip
+
             var fit = HologramFrame.Fit(_positions, header.Count, header.Min.y, header.Max.y, _histogram);
             if (!_hasFit || HologramFit.IsCut(_fitTarget, fit))
                 _fitShown = fit; // a new shot: jump rather than glide

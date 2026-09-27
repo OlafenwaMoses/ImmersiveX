@@ -1,3 +1,4 @@
+using System.IO;
 using ImmersiveX.Editor;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -14,6 +15,12 @@ namespace ImmersiveX.Media.Editor
         /// <summary>GenXR's 3.5D Xperience: a music video reconstructed as a streamed Gaussian-splat hologram.</summary>
         public const string XperienceStreamUrl = "https://genxr-streaming-media.sfo3.cdn.digitaloceanspaces.com/demos/3-5d-xperience/stream.json";
 
+        /// <summary>
+        /// A 4D Gaussian-splat capture of a cartoon zebra, bundled inside the app (StreamingAssets) so it plays offline. Made
+        /// by <c>tools/content/splat_sequence_to_stream.py</c>; see docs/media.md.
+        /// </summary>
+        public const string ZebraSource = "ImmersiveXContent/Zebra/stream.json";
+
         [MenuItem("ImmersiveX/Demos/3.5D Xperience (streamed hologram)", false, 20)]
         static void CreateXperienceMenu()
         {
@@ -22,9 +29,12 @@ namespace ImmersiveX.Media.Editor
         }
 
         /// <summary>
-        /// Build <c>Assets/Demos/Xperience35D/Xperience35D.unity</c>: the ImmersiveX rig plus Immersive Media streaming the
-        /// 3.5D Xperience at base quality, 1.60 m tall, with media controls. It waits paused for the Play button and plays
-        /// once. It becomes the first scene in the build.
+        /// Build <c>Assets/Demos/Xperience35D/Xperience35D.unity</c>: the ImmersiveX rig plus two Immersive Media, each with
+        /// its own controls. They wait paused for the Play button and play once. The scene becomes the first in the build.
+        /// <list type="bullet">
+        /// <item>The 3.5D Xperience, streamed at base quality, 1.60 m tall, at the centre of the room.</item>
+        /// <item>The 4D zebra, played from inside the app at its captured size, beside it.</item>
+        /// </list>
         /// </summary>
         public static bool TryCreateXperience()
         {
@@ -39,7 +49,24 @@ namespace ImmersiveX.Media.Editor
             serialized.FindProperty("_height").floatValue = 1.6f;
             serialized.FindProperty("_playOnStart").boolValue = false; // waits for the Play button
             serialized.FindProperty("_loop").boolValue = false;        // plays once; Play starts it again
+            serialized.FindProperty("_spot").intValue = 0;             // the centre of the room
             serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var zebra = new GameObject("Zebra (4D)").AddComponent<ImmersiveMedia>();
+            serialized = new SerializedObject(zebra);
+            serialized.FindProperty("_source").stringValue = ZebraSource;
+            serialized.FindProperty("_title").stringValue = "Zebra (4D)";
+            serialized.FindProperty("_height").floatValue = 1.35f;       // its captured size
+            serialized.FindProperty("_playOnStart").boolValue = false;
+            serialized.FindProperty("_loop").boolValue = false;
+            serialized.FindProperty("_spot").intValue = 1;               // beside the 3.5D Xperience
+            serialized.FindProperty("_bufferSeconds").floatValue = 2f;   // local frames: a short buffer is plenty
+            serialized.FindProperty("_prerollSeconds").floatValue = 0.5f;
+            serialized.FindProperty("_parallelDownloads").intValue = 8;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            if (!File.Exists(Path.Combine(Application.streamingAssetsPath, ZebraSource)))
+                ImmersiveXLog.Warn($"The zebra isn't in StreamingAssets yet. Make it with: python3 tools/content/splat_sequence_to_stream.py " +
+                                   "research/atlux_ue_zebra_4dgs_ply Assets/StreamingAssets/ImmersiveXContent/Zebra --fps 30 --title Zebra");
 
             EditorSceneManager.SaveScene(SceneManager.GetActiveScene(), XperienceScenePath);
             ImmersiveXLog.Info($"Created {XperienceScenePath} (first scene in the build).");

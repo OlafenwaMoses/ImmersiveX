@@ -143,3 +143,6 @@ research
 # Test samples made by tools/samples/make_media_samples.py (generated, never committed)
 /[Aa]ssets/StreamingAssets/ImmersiveXSamples/
 /[Aa]ssets/StreamingAssets/ImmersiveXSamples.meta
+# Bundled content made by tools/content (large; regenerate it, see docs/media.md)
+/[Aa]ssets/StreamingAssets/ImmersiveXContent/
+/[Aa]ssets/StreamingAssets/ImmersiveXContent.meta

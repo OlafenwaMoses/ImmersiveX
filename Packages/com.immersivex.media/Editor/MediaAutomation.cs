@@ -81,9 +81,9 @@ namespace ImmersiveX.Media.Editor
                 case "mute": media.SetMuted(true); break;
                 case "unmute": media.SetMuted(false); break;
                 case "volume": media.SetVolume(Number(1)); break;
-                case "turn": media.Turn(Number(1)); break;
-                case "move": media.MoveBy(new Vector3(Number(1), 0f, Number(2))); break;
-                case "height": media.Height = Number(1); break;
+                case "turn": media.Turn(Number(1)); media.SavePlacement(); break; // as if the user let go of it
+                case "move": media.MoveBy(new Vector3(Number(1), 0f, Number(2))); media.SavePlacement(); break;
+                case "height": media.Height = Number(1); media.SavePlacement(); break;
                 case "open":
                     if (parts.Length < 2)
                         throw new ArgumentException("Usage: media open <source> [format]");

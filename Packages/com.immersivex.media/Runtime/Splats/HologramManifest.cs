@@ -8,7 +8,8 @@ namespace ImmersiveX.Media
     /// <summary>
     /// A streamed hologram's <c>stream.json</c>: frame rate, frame count, audio, quantisation ranges and the quality
     /// tiers. Every tier holds the same frames; lower tiers merge neighbouring Gaussians so each frame is smaller.
-    /// Frames live at <c>&lt;base&gt;/&lt;tier path&gt;/NNNNNN.bin</c>.
+    /// Frames live at <c>&lt;base&gt;/&lt;tier path&gt;/NNNNNN.bin</c>. An optional <c>fit</c> gives one fit for the whole clip
+    /// (<c>tools/content/splat_sequence_to_stream.py</c> writes one), so a character keeps its size when it raises an arm.
     /// </summary>
     public sealed class HologramManifest
     {
@@ -19,6 +20,10 @@ namespace ImmersiveX.Media
         public Vector2 ScaleRange { get; private set; }
         public string BaseUrl { get; private set; }
         public string AudioUrl { get; private set; }
+
+        /// <summary>One fit for every frame, in the source's y-down units; null to fit each frame.</summary>
+        public HologramFit? Fit { get; private set; }
+
         public IReadOnlyList<HologramTier> Tiers => _tiers;
 
         readonly List<HologramTier> _tiers = new List<HologramTier>();
@@ -48,6 +53,15 @@ namespace ImmersiveX.Media
             if (root.TryGetValue("audio", out var audio) && audio is Dictionary<string, object> audioInfo &&
                 audioInfo.TryGetValue("file", out var file) && file is string audioFile && audioFile.Length > 0)
                 manifest.AudioUrl = new Uri(baseUri, audioFile).AbsoluteUri;
+
+            if (root.TryGetValue("fit", out var fit) && fit is Dictionary<string, object> clipFit && clipFit.ContainsKey("top") && clipFit.ContainsKey("bottom"))
+                manifest.Fit = new HologramFit
+                {
+                    CentreX = (float)Number(clipFit, "centre_x"),
+                    CentreZ = (float)Number(clipFit, "centre_z"),
+                    Top = (float)Number(clipFit, "top"),
+                    Bottom = (float)Number(clipFit, "bottom"),
+                };
 
             foreach (var entry in (List<object>)root["tiers"])
                 manifest._tiers.Add(HologramTier.Parse((Dictionary<string, object>)entry, manifest.FrameCount));

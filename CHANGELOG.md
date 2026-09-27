@@ -70,7 +70,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - **Side handles:** a move bar under the controls, turn bars at the sides (about the up axis only) and a resize corner. They work with hands or controllers, by ray or pinch.
   - **Several pieces of media per scene:**
     - the first stands at the centre of the mapped room and the rest around it, each facing the user;
-    - each stays where it was put, because its placement is saved relative to the recognised room (`RoomPlacements`).
+    - each stays where it was put, held by a spatial anchor (see M3 below).
   - **Rendering:**
     - splats of every format go through one URP splat shader (maths matched to GenXR's web player), sorted on worker threads;
     - big scenes keep their most visible splats (400,000 on standalone headsets);
@@ -79,12 +79,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - **Sound:** Android MediaPlayer on Meta Quest (`IStreamAudioProvider`). It's the clock for streams and sequences.
   - **Vendor formats:** `IMediaCodec` is a plug-in point for them (4DViews, Arcturus), which need their own SDKs.
   - **Samples:** `tools/samples/make_media_samples.py` generates a 5 MB test sample of every format (git-ignored, not committed), all showing one asymmetric test figure. EditMode tests decode each one and check its orientation; they're skipped when the samples haven't been made.
-  - **Demo scene:** **ImmersiveX ▸ Demos ▸ 3.5D Xperience** (GenXR's streamed hologram), the first scene in the build.
+  - **Demo scene:** **ImmersiveX ▸ Demos ▸ 3.5D Xperience**, the first scene in the build: GenXR's streamed hologram, and the bundled 4D zebra beside it.
+  - **Bundled 4D content:**
+    - `tools/content/splat_sequence_to_stream.py` packs a 4D Gaussian-splat capture (a folder of 3DGS `.ply` frames) into a hologram stream that ships inside the app and plays offline, at 17 bytes a Gaussian.
+    - A stream's `stream.json` can carry one `fit` for the whole clip, so a character keeps its size when it raises an arm.
+    - The generated content (`Assets/StreamingAssets/ImmersiveXContent/`) is git-ignored because of its size.
   - **Automation:**
     - `media list`, and `media [@n|@name] status|play|pause|toggle|seek|mute|unmute|speaker|volume|turn|move|height|open`;
     - `demo`;
     - `resolve` (re-resolve packages).
 - `WalkableArea.Centre()` and `FloorGrabTransformer` (slide across the floor, turn about the up axis only) in core.
+
+- **M3 (in progress): content stays put with spatial anchors.** It moves only when the user moves it.
+  - `ContentAnchor`, added by Immersive Media and Immersive Content:
+    - at start-up it restores the saved spatial anchor, else the pose saved with the room;
+    - when the user lets go it saves the pose at once, then 0.5 s later anchors it there, saves the anchor and erases the old one;
+    - first placements are anchored too;
+    - content follows its anchor through tracking corrections and headset off/on, and hides while the anchor is lost.
+  - Anchor saves, loads and erases run one at a time, and a failed save is retried once.
+  - `PlacementIndex` (one JSON file per room, version 2): pose relative to the floor, size, anchor id and save time. Version-1 files still load. With no mapped room, placements are saved relative to the tracking space.
+  - "Forget room" erases the room's saved anchors.
+  - Automation's `media turn|move|height` save the placement as a release would.
 
 ### Fixed
 - The automation bridge could read `command.txt` between its creation and its first write, and drop the command. It now waits for content; writers should write `command.tmp` and rename it.
@@ -92,6 +107,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The walkable-area outline was drawn in the wrong place on Quest. On see-through and room-aware platforms the session now zeroes the rig's camera height offset, so the camera and the room's planes share one space. The outline follows the XR Origin's trackables.
 - XR Simulation showed a flat yellow background. The baseline now adds AR Foundation's **AR Background** URP renderer feature.
 - Play mode waited 10 s for head tracking in XR Simulation. Tracking is now also confirmed by `ARSession.state`.
+- In the editor, Play mode waited for the Game view to have focus before placing content, which stalled automation runs. Only devices wait for focus now.
 - Quest passthrough didn't draw. The configurator now enables the Meta Quest OpenXR feature set, including its required Composition Layers Support, and `Validate()` reports if it's off.
 - Quest wasn't detected on device. `MetaQuestAdapter` now recognises the running Meta session and logs why when it doesn't.
 - Room scanning no longer starts on platforms without room data.

@@ -39,6 +39,8 @@ namespace ImmersiveX.Media
     /// folder), and video (<c>.mp4 .webm .mov</c>: flat, 180° or 360°).</item>
     /// <item>Standing media is fitted to <see cref="Height"/> with its feet on the floor, at the centre of the mapped room,
     /// facing the user. Grab it to slide it across the floor; it turns about the up axis only.</item>
+    /// <item>It moves only when the user moves it. Where it's put is kept with a spatial anchor (see
+    /// <see cref="ContentAnchor"/>), so it stays in the same real spot when the headset comes off and after a relaunch.</item>
     /// <item>Flat video is an upright screen; 180°/360° video surrounds the user.</item>
     /// <item>It waits, paused, for the Play button unless <c>Play On Start</c> is set.</item>
     /// </list>
@@ -120,8 +122,11 @@ namespace ImmersiveX.Media
         FloorGrabTransformer _grabber;
         XRGrabInteractable _grab;
         BoxCollider _collider;
+        ContentAnchor _anchoring;
         bool _wantPlaying;
+        bool _placing;
         bool _placed;
+        bool _lost;
         bool _resumeAfterPause;
         bool _muted;
         bool _loading;
@@ -242,11 +247,16 @@ namespace ImmersiveX.Media
         /// <summary>Put the media at <paramref name="position"/> on the floor (kept inside the mapped room).</summary>
         public void MoveTo(Vector3 position) => transform.position = _grabber.Constrain(position);
 
-        /// <summary>Remember where the media is now, so it's back in the same spot next time in this room.</summary>
+        /// <summary>
+        /// Remember where the media is now: anchored there and saved, so it's back in the same real spot after the headset
+        /// comes off or the app restarts. Called when the user lets go of it.
+        /// </summary>
         public void SavePlacement()
         {
-            if (_placed && _playable?.Presentation != MediaPresentation.Surround)
-                RoomPlacements.Save(PlacementKey, new Pose(transform.position, transform.rotation), _height);
+            if (!_placed || _playable?.Presentation == MediaPresentation.Surround)
+                return;
+            _anchoring.Key = PlacementKey;
+            _anchoring.Commit(new Pose(transform.position, transform.rotation), _height);
         }
 
         void ApplySize()
@@ -272,7 +282,7 @@ namespace ImmersiveX.Media
             var state = !HasTimeline ? "still" : IsBuffering ? "buffering" : _wantPlaying ? "playing" : "paused";
             var time = HasTimeline ? $" {MediaControls.FormatTime(Position)} / {MediaControls.FormatTime(Duration)}" : string.Empty;
             return $"{Name}: {state}{time} · {_playable.Description} · {_playable.Presentation} · {_fps:0} fps · " +
-                   $"{transform.position:F2} yaw {transform.eulerAngles.y:0}°";
+                   $"{transform.position:F2} yaw {transform.eulerAngles.y:0}° · {_anchoring.Status}";
         }
 
         string Name => !string.IsNullOrEmpty(_title) ? _title : MediaSource.FileName(_source);
@@ -307,6 +317,15 @@ namespace ImmersiveX.Media
                 if (_grab.interactorsSelecting.Count == 0)
                     SavePlacement(); // let go: remember where it was put
             });
+
+            _anchoring = gameObject.AddComponent<ContentAnchor>();
+            _anchoring.KeepUpright = true;
+            _anchoring.Moved += () =>
+            {
+                // Tracking was corrected and the media moved with its anchor: grabs continue from where it is now.
+                _grabber.FloorHeight = transform.position.y;
+                _grabber.ResetConstraint(transform.position);
+            };
         }
 
         IEnumerator Start()
@@ -315,7 +334,7 @@ namespace ImmersiveX.Media
             if (session != null && session.State != SessionState.Ready && session.State != SessionState.Failed)
                 session.StateChanged += OnSessionStateChanged;
             else
-                Place();
+                StartCoroutine(Place());
 
             yield return Load();
         }
@@ -401,7 +420,7 @@ namespace ImmersiveX.Media
         void OnSessionStateChanged(SessionState state)
         {
             if (state == SessionState.Ready || state == SessionState.Failed)
-                Place();
+                StartCoroutine(Place());
         }
 
         void OnDestroy()
@@ -455,13 +474,31 @@ namespace ImmersiveX.Media
                 return;
             var viewer = Viewer();
             _playable.LateTick(viewer);
-            _content.gameObject.SetActive(_placed);
+            var lost = _anchoring.IsLost && _playable.Presentation != MediaPresentation.Surround;
+            if (lost != _lost)
+            {
+                _lost = lost;
+                ImmersiveXLog.Info(lost ? $"Media: {Name} is hidden until the headset finds its anchor again." : $"Media: {Name} is back: its anchor was found.");
+            }
+
+            Show(_placed && !lost);
 
             if (_playable.Presentation != MediaPresentation.Surround && !_grabber.IsHeld && Time.unscaledTime >= _nextCollider)
             {
                 _nextCollider = Time.unscaledTime + ColliderRefreshSeconds;
                 SizeCollider(_playable.Bounds);
             }
+        }
+
+        /// <summary>Show or hide the media with its controls and handles: hidden until placed, and while its anchor is lost.</summary>
+        void Show(bool shown)
+        {
+            if (_content.gameObject.activeSelf != shown)
+                _content.gameObject.SetActive(shown);
+            if (_controls != null && _controls.gameObject.activeSelf != shown)
+                _controls.gameObject.SetActive(shown);
+            if (_handles != null && _handles.gameObject.activeSelf != shown)
+                _handles.gameObject.SetActive(shown);
         }
 
         void ApplyVolume() => _playable?.SetVolume(_muted ? 0f : _volume);
@@ -511,33 +548,51 @@ namespace ImmersiveX.Media
         }
 
         /// <summary>
-        /// Stand it on the floor at the centre of the mapped room (or in front of the user when there's no room), facing
-        /// the user.
+        /// Put it back where the user left it: at its spatial anchor, else where it was saved in the room. The first time,
+        /// stand it on the floor at the centre of the mapped room (or in front of the user when there's no room), facing
+        /// the user, and anchor it there.
         /// </summary>
-        void Place()
+        IEnumerator Place()
         {
+            if (_placing || _placed || Viewer() == null)
+                yield break;
+            _placing = true;
+            RestoredPlacement restored = null;
+            var restoring = true;
+            _anchoring.Key = PlacementKey;
+            _anchoring.Restore(result =>
+            {
+                restored = result;
+                restoring = false;
+            });
+            while (restoring)
+                yield return null;
+            _placing = false;
+
             var head = Viewer();
             if (head == null)
-                return;
-
+                yield break;
             var user = UserRelativePlacement.UserPose(head);
             var floor = FloorHeight();
             var forward = user.rotation * Vector3.forward;
             Vector3 position;
             Quaternion rotation;
             string where;
-            if (RoomPlacements.TryLoad(PlacementKey, out var saved, out var savedSize))
+            if (restored != null)
             {
-                // Put back where the user left it in this room.
-                position = saved.position;
-                rotation = saved.rotation;
-                if (savedSize > 0f)
+                position = restored.Pose.position;
+                if (restored.FromAnchor)
+                    floor = position.y; // the anchor sits on the real floor
+                else
+                    position.y = floor;
+                rotation = restored.Pose.rotation;
+                if (restored.Size > 0f)
                 {
-                    _height = Mathf.Clamp(savedSize, 0.3f, 4f);
+                    _height = Mathf.Clamp(restored.Size, 0.3f, 4f);
                     ApplySize();
                 }
 
-                where = "where it was left";
+                where = restored.FromAnchor ? $"at its spatial anchor ({ContentAnchor.Short(_anchoring.SavedAnchorId)})" : "where it was left in the room";
             }
             else
             {
@@ -581,6 +636,8 @@ namespace ImmersiveX.Media
             _placed = true;
             PlaceControls();
             ImmersiveXLog.Info($"Media: placed {where}, {Vector3.Distance(Flat(position), Flat(user.position)):0.0} m from the user, on the floor at {floor:0.00} m.");
+            if (restored == null || !restored.FromAnchor)
+                SavePlacement(); // anchor it here, so it's in this spot next time too
             if (_wantPlaying && _playable != null && _playable.IsLoaded)
                 Play();
         }

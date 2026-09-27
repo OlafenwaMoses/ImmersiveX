@@ -5,13 +5,13 @@
 2. attaches the right player;
 3. shows the same acrylic media controls and side handles whatever the format.
 
-A scene can hold as many as you like. Each has its own controls, and each stays where the user put it.
+A scene can hold as many as you like. Each has its own controls, and each stays where the user put it, held there by a spatial anchor.
 
 ## Formats
 
 | Kind | Files | How it shows |
 |---|---|---|
-| GenXR 3.5D hologram stream | `stream.json` + `tiers/<tier>/NNNNNN.bin` + soundtrack | Standing, fitted to a fixed height, streamed at the chosen quality |
+| GenXR 3.5D hologram stream | `stream.json` + `tiers/<tier>/NNNNNN.bin` (+ soundtrack), streamed or [bundled in the app](#bundled-4d-content) | Standing, fitted to a fixed height, at the chosen quality |
 | Gaussian splats | `.ply` (3DGS), compressed `.ply` (PlayCanvas / SuperSplat), `.splat`, `.spz` (v1–v4), `.ksplat` (levels 0–2) | Standing; big scenes keep their most visible splats |
 | Point cloud | `.ply` with x, y, z (and red, green, blue) | Standing, each point drawn as a small splat |
 | Model | `.glb`, `.gltf` (glTFast), with animation | Standing; the first animation is the timeline |
@@ -29,9 +29,15 @@ A scene can hold as many as you like. Each has its own controls, and each stays 
 - **The first media in the scene hierarchy** stands at the **centre of the mapped room**; the others stand around it. With no mapped room, as in the editor simulators, the group centres 2 m in front of the user.
   - Set **Spot** to choose: 0 is the centre and 1 and up stand around it.
 - **Standing media** is fitted to **Height** (1.60 m by default) with its feet on the floor, facing the user.
-- **Hologram streams** are fitted frame by frame and jump at camera cuts.
+- **Hologram streams** are fitted frame by frame and jump at camera cuts. A stream with a `fit` in its `stream.json` keeps that one fit for the whole clip, so a character keeps its size when it raises an arm.
 - **Sequences** keep the first frame's scale, so a performer can move.
-- **Everything stays where it's put.** When the user moves, turns or resizes media, its place is saved relative to the recognised room, so the next launch in the same room puts it back in the same real spot. "Forget room" forgets those places too.
+- **It moves only when the user moves it, and it stays where it's put:**
+  - The first time, it's anchored where it's placed.
+  - When the user lets go after moving, turning or resizing it, it's anchored again half a second later. The anchor is saved on the device, and the old one is erased.
+  - Next launch, it comes back at its **spatial anchor**: the same real-world spot, even if the headset re-centred.
+  - While the app runs, it **follows its anchor**. When the headset is taken off and put back on, or tracking is corrected, it stays in the same real spot. Until the device finds the anchor again, it's hidden rather than shown in the wrong place.
+  - **Fallback:** its place is also saved relative to the recognised room, or to the tracking space when no room is mapped. That's used when the anchor can't be loaded, and on platforms that can't save anchors (XR Simulation).
+  - "Forget room" forgets those places and erases their anchors.
 
 ## What the user can do
 - **Controls** (an acrylic-glass panel in front of each piece of media):
@@ -58,6 +64,22 @@ A sequence file is small JSON, with paths relative to it:
 - **`up`** can be `+y`, `-y`, `+z` or `-z`. The defaults are y-down for splats and y-up for points and meshes.
 - **Frames** download in parallel and decode on worker threads, a second or two ahead.
 
+## Bundled 4D content
+A 4D Gaussian-splat capture (4DGS) is a folder of standard 3DGS `.ply` files, one per frame. Pack it into a hologram stream under `Assets/StreamingAssets` and it ships **inside the app**: it plays from local storage with no network.
+
+```
+python3 tools/content/splat_sequence_to_stream.py research/atlux_ue_zebra_4dgs_ply \
+    Assets/StreamingAssets/ImmersiveXContent/Zebra --fps 30 --title Zebra
+```
+
+- **What it writes:** `stream.json` and one frame file per `.ply`, at 17 bytes a Gaussian (a sixth of the `.ply`). The frames upload to the GPU as they are, so playback costs almost no CPU.
+- **What it keeps:** the view-independent colour (the SH DC term). The higher spherical-harmonic bands are dropped; on the zebra they change the colour by about 4 %.
+- **One fit for the clip:** the character's usual height, feet and centre over the whole clip, written as `fit` in `stream.json`.
+- **Options:** `--max-splats` keeps the most visible Gaussians per frame (fewer bytes, less detail); `--up +y` handles y-up sources.
+- **Size:** the zebra is 164 frames × 100,000 Gaussians = 267 MB in the APK, read at 51 MB/s while it plays.
+- **Not committed:** `Assets/StreamingAssets/ImmersiveXContent/` is git-ignored because of its size. Run the command above before building.
+- **Playing it:** set an Immersive Media's **Source** to the path inside StreamingAssets, e.g. `ImmersiveXContent/Zebra/stream.json`. A short buffer is enough for local frames (the demo uses 2 s, with 0.5 s of preroll).
+
 ## Streaming and sound
 - **Hologram streams:**
   - They buffer 3 s ahead with 24 parallel downloads, because one connection is limited by latency.
@@ -77,7 +99,9 @@ A sequence file is small JSON, with paths relative to it:
 - **Tests:** the format EditMode tests decode each sample and check that orientation. Without the samples, those tests are skipped.
 - **Trying one:** in Play mode, send `media open ImmersiveXSamples/<file>` to play it, or set it as an Immersive Media's Source.
 
-**ImmersiveX ▸ Demos ▸ 3.5D Xperience** builds the demo scene: GenXR's streamed hologram, as the first scene in the build.
+**ImmersiveX ▸ Demos ▸ 3.5D Xperience** builds the demo scene, the first scene in the build:
+- GenXR's streamed hologram, at the centre of the room;
+- the bundled 4D zebra beside it, at its captured size (1.35 m).
 
 ## Automation
 With the editor open (see [CONTRIBUTING](../CONTRIBUTING.md#driving-the-open-editor-automation)):
