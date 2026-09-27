@@ -135,3 +135,11 @@ Thumbs.db
 # XR Simulation per-user preferences (chosen environment, navigation input); recreated automatically.
 /[Aa]ssets/XR/UserSimulationSettings/
 /[Aa]ssets/XR/UserSimulationSettings.meta
+
+
+# Research
+research
+
+# Test samples made by tools/samples/make_media_samples.py (generated, never committed)
+/[Aa]ssets/StreamingAssets/ImmersiveXSamples/
+/[Aa]ssets/StreamingAssets/ImmersiveXSamples.meta

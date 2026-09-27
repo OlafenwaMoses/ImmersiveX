@@ -84,6 +84,13 @@ Everything marked ❌ is checked on the headset.
   - **Show area** redraws the outline.
 - Saved rooms live in `Android/data/genxr.immersivex.app/files/ImmersiveX/spaces/`.
 
+## Media (holograms, splats, models, video)
+- **Build order:** the **3.5D Xperience** demo scene is first in the build, then `Main.unity`.
+- **Any content:** add Immersive Media objects to a scene, each with its own controls and handles. See the [Immersive Media guide](../media.md).
+- **Bandwidth:** the 3.5D Xperience's base quality needs about **24 MB/s**, so use fast Wi-Fi (Wi-Fi 6 near the router). If it keeps showing *Buffering*, the link is too slow. The status line, logged every 10 s, shows the download rate.
+- **Sound:** plays through Android's MediaPlayer. The build requires the INTERNET permission, which the configurator sets.
+- **Splat budget:** big splat scenes keep their 400,000 most visible splats on the headset. Set **Max Gaussians** to change that.
+
 ## Device checklist
 | Check | How | Expected |
 |---|---|---|
@@ -96,6 +103,10 @@ Everything marked ❌ is checked on the headset.
 | Anchor after headset off/on (S2) | Take the headset off for 10 s, put it back on | The marker hasn't moved |
 | Anchor after restart (S2) | Quit the app fully, relaunch | The marker reloads in the same real-world spot |
 | Frame rate | Panel | 72 fps or better |
+| Hologram (3.5D) | Launch, press **Play** | At the room's centre, 1.6 m tall, with sound; no *Buffering* after the first second |
+| Several pieces of media | A scene with more than one Immersive Media | Each stands in its own spot around the centre, facing you, with its own controls |
+| Handles | Drag the move bar, a turn bar, the resize corner | It slides across the floor, turns only about the up axis, and resizes; the panel follows moves but not turns |
+| Stays put | Move something, quit, relaunch in the same room | It's back where you left it |
 
 Record results in `docs/validation/`.
 

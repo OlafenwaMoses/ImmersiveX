@@ -133,14 +133,19 @@ namespace ImmersiveX.Editor
                 AssetDatabase.CreateAsset(material, RuntimeMaterialPath);
             }
 
+            AssignSetting("_runtimeMaterial", material);
+        }
+
+        static void AssignSetting(string field, Object value)
+        {
             var settings = AssetDatabase.LoadAssetAtPath<ImmersiveXSettings>(SettingsPath);
             if (settings == null)
                 return;
             var serialized = new SerializedObject(settings);
-            var reference = serialized.FindProperty("_runtimeMaterial");
+            var reference = serialized.FindProperty(field);
             if (reference.objectReferenceValue == null)
             {
-                reference.objectReferenceValue = material;
+                reference.objectReferenceValue = value;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
             }
         }

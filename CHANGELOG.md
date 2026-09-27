@@ -54,7 +54,40 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - Room tracking pauses once the room is mapped.
   - Automation commands: `invoke rescan|forget|showarea|scandone|scanskip`, `prompt primary|secondary`, `turn <deg> <s>`.
 
+- **ImmersiveX Media** (`com.immersivex.media`, [guide](docs/media.md)): one **Immersive Media** component plays any supported media in the room.
+  - **Detection and players:** it detects the format and attaches the right player:
+    - GenXR 3.5D hologram streams;
+    - Gaussian splats: 3DGS `.ply`, compressed `.ply`, `.splat`, `.spz` v1–v4 and `.ksplat` levels 0–2;
+    - point clouds;
+    - glTF/GLB models with animation, through glTFast 6.20.0;
+    - OBJ and PLY meshes;
+    - frame sequences of any of these (a sequence `.json` or a folder);
+    - flat, 180° and 360° video, mono or stereo.
+  - **The same acrylic controls on every format:**
+    - play/pause, seek, time, speaker and volume;
+    - greyed out for stills;
+    - the panel follows the media's position but not its rotation.
+  - **Side handles:** a move bar under the controls, turn bars at the sides (about the up axis only) and a resize corner. They work with hands or controllers, by ray or pinch.
+  - **Several pieces of media per scene:**
+    - the first stands at the centre of the mapped room and the rest around it, each facing the user;
+    - each stays where it was put, because its placement is saved relative to the recognised room (`RoomPlacements`).
+  - **Rendering:**
+    - splats of every format go through one URP splat shader (maths matched to GenXR's web player), sorted on worker threads;
+    - big scenes keep their most visible splats (400,000 on standalone headsets);
+    - meshes draw unlit;
+    - 360° video draws on an inside-out sphere, with per-eye stereo halves.
+  - **Sound:** Android MediaPlayer on Meta Quest (`IStreamAudioProvider`). It's the clock for streams and sequences.
+  - **Vendor formats:** `IMediaCodec` is a plug-in point for them (4DViews, Arcturus), which need their own SDKs.
+  - **Samples:** `tools/samples/make_media_samples.py` generates a 5 MB test sample of every format (git-ignored, not committed), all showing one asymmetric test figure. EditMode tests decode each one and check its orientation; they're skipped when the samples haven't been made.
+  - **Demo scene:** **ImmersiveX ▸ Demos ▸ 3.5D Xperience** (GenXR's streamed hologram), the first scene in the build.
+  - **Automation:**
+    - `media list`, and `media [@n|@name] status|play|pause|toggle|seek|mute|unmute|speaker|volume|turn|move|height|open`;
+    - `demo`;
+    - `resolve` (re-resolve packages).
+- `WalkableArea.Centre()` and `FloorGrabTransformer` (slide across the floor, turn about the up axis only) in core.
+
 ### Fixed
+- The automation bridge could read `command.txt` between its creation and its first write, and drop the command. It now waits for content; writers should write `command.tmp` and rename it.
 - Shapes created at runtime (anchor marker, panel grab bar, walkable-area outline) rendered pink on device. They now use a bundled URP Unlit material (`ImmersiveXRuntime.mat`), referenced from the settings asset so it's always in the build.
 - The walkable-area outline was drawn in the wrong place on Quest. On see-through and room-aware platforms the session now zeroes the rig's camera height offset, so the camera and the room's planes share one space. The outline follows the XR Origin's trackables.
 - XR Simulation showed a flat yellow background. The baseline now adds AR Foundation's **AR Background** URP renderer feature.

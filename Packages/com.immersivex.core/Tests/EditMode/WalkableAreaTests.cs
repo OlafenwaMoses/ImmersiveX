@@ -26,6 +26,33 @@ namespace ImmersiveX.Tests
         }
 
         [Test]
+        public void Centre_OfASquareRoomIsItsMiddle()
+        {
+            var centre = WalkableArea.Build(Square4m, margin: 0.3f).Centre();
+
+            Assert.IsTrue(centre.HasValue);
+            Assert.AreEqual(0f, centre.Value.x, 0.05f);
+            Assert.AreEqual(0f, centre.Value.y, 0.05f);
+        }
+
+        [Test]
+        public void Centre_OfAnLShapedRoomIsSomewhereYouCanStand()
+        {
+            var area = WalkableArea.Build(LShape, margin: 0.3f);
+            var centre = area.Centre();
+
+            Assert.IsTrue(centre.HasValue);
+            Assert.IsTrue(area.Contains(centre.Value), $"{centre.Value} should be walkable");
+        }
+
+        [Test]
+        public void Centre_IsNullWhenNothingIsWalkable()
+        {
+            var tiny = new[] { new Vector2(0, 0), new Vector2(0.4f, 0), new Vector2(0.4f, 0.4f), new Vector2(0, 0.4f) };
+            Assert.IsNull(WalkableArea.Build(tiny, margin: 0.3f).Centre());
+        }
+
+        [Test]
         public void LShapedRoom_ExcludesTheMissingCorner()
         {
             var area = WalkableArea.Build(LShape, margin: 0.3f);

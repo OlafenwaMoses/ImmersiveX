@@ -69,6 +69,50 @@ namespace ImmersiveX
             return IsWalkable(column, row);
         }
 
+        /// <summary>
+        /// The middle of the walkable area in floor-plane space: the centroid of its cells, or the walkable cell nearest
+        /// to it when the centroid falls outside (an L-shaped room, say). Null when nothing is walkable.
+        /// </summary>
+        public Vector2? Centre()
+        {
+            double sumColumns = 0, sumRows = 0;
+            var cells = 0;
+            for (var row = 0; row < Rows; row++)
+            for (var column = 0; column < Columns; column++)
+            {
+                if (!IsWalkable(column, row))
+                    continue;
+                sumColumns += column + 0.5;
+                sumRows += row + 0.5;
+                cells++;
+            }
+
+            if (cells == 0)
+                return null;
+
+            var centroid = new Vector2((float)(sumColumns / cells), (float)(sumRows / cells));
+            if (IsWalkable(Mathf.FloorToInt(centroid.x), Mathf.FloorToInt(centroid.y)))
+                return Origin + centroid * CellSize;
+
+            var best = Vector2.zero;
+            var bestDistance = float.MaxValue;
+            for (var row = 0; row < Rows; row++)
+            for (var column = 0; column < Columns; column++)
+            {
+                if (!IsWalkable(column, row))
+                    continue;
+                var cell = new Vector2(column + 0.5f, row + 0.5f);
+                var distance = (cell - centroid).sqrMagnitude;
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = cell;
+                }
+            }
+
+            return Origin + best * CellSize;
+        }
+
         bool IsWalkable(int column, int row) =>
             column >= 0 && row >= 0 && column < Columns && row < Rows && _cells[row * Columns + column];
 

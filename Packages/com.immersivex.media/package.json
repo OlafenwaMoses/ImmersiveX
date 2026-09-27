@@ -1,0 +1,30 @@
+{
+  "name": "com.immersivex.media",
+  "version": "0.1.0",
+  "displayName": "ImmersiveX Media",
+  "description": "Plays immersive media in the user's room with one component and the same acrylic controls: GenXR 3.5D hologram streams, Gaussian splats (.ply, .splat, .spz, .ksplat), point clouds, animated glTF/GLB models, OBJ/PLY mesh sequences, and 2D, 180\u00b0 and 360\u00b0 video. The format is detected automatically.",
+  "unity": "6000.3",
+  "unityRelease": "23f1",
+  "license": "MIT",
+  "author": {
+    "name": "Moses Olafenwa",
+    "url": "https://github.com/OlafenwaMoses"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OlafenwaMoses/ImmersiveX.git"
+  },
+  "keywords": [
+    "xr",
+    "mixed reality",
+    "gaussian splatting",
+    "volumetric video",
+    "gltf",
+    "360 video",
+    "hologram"
+  ],
+  "dependencies": {
+    "com.immersivex.core": "0.1.0",
+    "com.unity.cloud.gltfast": "6.20.0"
+  }
+}

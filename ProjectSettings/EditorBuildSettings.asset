@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Demos/Xperience35D/Xperience35D.unity
+    guid: 8d368494f720f4f739b77d10faf93e11
+  - enabled: 1
     path: Assets/Scenes/Main.unity
     guid: 9de0e6d79f0294932a32dd9c944a6879
   m_configObjects:
