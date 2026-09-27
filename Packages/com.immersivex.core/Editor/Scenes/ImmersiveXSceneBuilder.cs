@@ -108,7 +108,7 @@ namespace ImmersiveX.Editor
 
         static void PutFirstInBuild(string path)
         {
-            var others = EditorBuildSettings.scenes.Where(scene => scene.path != path);
+            var others = EditorBuildSettings.scenes.Where(scene => scene.path != path && File.Exists(scene.path)); // drop deleted scenes
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(path, true) }.Concat(others).ToArray();
         }
     }

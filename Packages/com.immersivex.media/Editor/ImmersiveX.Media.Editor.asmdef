@@ -1,0 +1,20 @@
+{
+  "name": "ImmersiveX.Media.Editor",
+  "rootNamespace": "ImmersiveX.Media.Editor",
+  "references": [
+    "ImmersiveX.Core",
+    "ImmersiveX.Core.Editor",
+    "ImmersiveX.Media"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

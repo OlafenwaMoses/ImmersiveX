@@ -139,3 +139,7 @@ Thumbs.db
 
 # Research
 research
+
+# Test samples made by tools/samples/make_media_samples.py (generated, never committed)
+/[Aa]ssets/StreamingAssets/ImmersiveXSamples/
+/[Aa]ssets/StreamingAssets/ImmersiveXSamples.meta

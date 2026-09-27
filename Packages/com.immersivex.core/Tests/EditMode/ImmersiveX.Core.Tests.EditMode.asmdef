@@ -5,7 +5,8 @@
     "ImmersiveX.Core",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
-    "Unity.XR.ARSubsystems"
+    "Unity.XR.ARSubsystems",
+    "Unity.XR.Interaction.Toolkit"
   ],
   "includePlatforms": [
     "Editor"

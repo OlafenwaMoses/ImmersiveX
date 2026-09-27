@@ -1,0 +1,22 @@
+{
+  "name": "ImmersiveX.Media",
+  "rootNamespace": "ImmersiveX.Media",
+  "references": [
+    "ImmersiveX.Core",
+    "Unity.XR.ARFoundation",
+    "Unity.XR.ARSubsystems",
+    "Unity.XR.CoreUtils",
+    "Unity.XR.Interaction.Toolkit",
+    "UnityEngine.UI",
+    "glTFast"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

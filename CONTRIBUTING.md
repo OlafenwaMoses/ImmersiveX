@@ -101,15 +101,16 @@ Copy `Platforms/_Template` and follow [docs/adding-a-platform.md](docs/adding-a-
 
 ## Driving the open editor (automation)
 Scripts, CI helpers and coding agents can drive an open editor through `EditorAutomation`:
-1. Write one command to `Library/ImmersiveX/Automation/command.txt`.
+1. Write one command to `Library/ImmersiveX/Automation/command.tmp`, then rename it to `command.txt`, so the editor never reads a half-written command.
 2. Read `result.txt` in the same folder. Play runs also write `play-log.txt` and `play.png`.
 
 Commands:
-- `refresh` · `test editmode`
+- `refresh` · `resolve` (re-resolve packages) · `test editmode`
 - `open <scene>` · `playmode xr-simulation|metaquest-simulator`
 - `play <seconds>` (`0` keeps playing until `stop`) · `stop` · `capture`
 - `invoke <panel action>`
+- `media list` · `media [@<n>|@<name>] status|play|pause|toggle|seek <s>|mute|unmute|speaker|volume <0-1>|turn <deg>|move <x> <z>|height <m>|open <source> [format]` (ImmersiveX Media)
 - `configure <platform>` · `build <platform>` · `buildrun <platform>`
-- `scene` · `baseline` · `menu <path>`
+- `scene` · `demo` (3.5D Xperience scene) · `baseline` · `menu <path>`
 
 Every command runs the same code as the menus, so you can watch it happen.

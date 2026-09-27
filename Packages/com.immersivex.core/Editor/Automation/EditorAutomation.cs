@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
@@ -15,12 +16,13 @@ namespace ImmersiveX.Editor
     /// <remarks>
     /// Commands:
     /// <list type="bullet">
-    /// <item><c>refresh</c>: import changed files and recompile · <c>test [editmode|playmode]</c>: run the Unity tests</item>
+    /// <item><c>refresh</c>: import changed files and recompile · <c>resolve</c>: re-resolve packages · <c>test [editmode|playmode]</c>: run the Unity tests</item>
     /// <item><c>play [seconds]</c>: enter Play mode, record the log, take a screenshot, stop after the given time (default 20; 0 = keep playing until <c>stop</c>)</item>
     /// <item><c>capture</c>: screenshot the Game view now</item>
     /// <item><c>invoke rescan|forget|showarea|saveanchor|loadanchor|eraseanchor|scandone|scanskip</c>: press a Device Check or scan button</item>
     /// <item><c>prompt primary|secondary</c>: press a button on the ImmersiveX prompt that's showing</item>
     /// <item><c>turn &lt;degrees&gt; &lt;seconds&gt;</c>: turn the rig on the spot (Play mode) to test the guided look-around's coverage and coaching</item>
+    /// <item>Commands other packages register with <see cref="RegisterCommand"/>, e.g. ImmersiveX Media's <c>media …</c> and <c>demo</c></item>
     /// <item><c>stop</c>: leave Play mode</item>
     /// <item><c>playmode xr-simulation|metaquest-simulator</c>: choose the Play-mode runtime</item>
     /// <item><c>configure &lt;platform&gt;</c>, <c>build &lt;platform&gt;</c>, <c>buildrun &lt;platform&gt;</c>: Platform Setup actions</item>
@@ -61,6 +63,17 @@ namespace ImmersiveX.Editor
                 Application.logMessageReceivedThreaded += RecordLog;
         }
 
+        static readonly Dictionary<string, Action<string, string>> Commands = new Dictionary<string, Action<string, string>>();
+
+        /// <summary>
+        /// Add a command (other packages do this, e.g. ImmersiveX Media's <c>media</c> and <c>demo</c>). The handler gets the
+        /// whole command line and its argument, and reports with <see cref="Report"/>; exceptions become an error result.
+        /// </summary>
+        public static void RegisterCommand(string verb, Action<string, string> handler) => Commands[verb.ToLowerInvariant()] = handler;
+
+        /// <summary>Write the result of a command to <c>result.txt</c>: status is "ok", "error" or "running".</summary>
+        public static void Report(string command, string status, string details) => WriteResult(command, status, details);
+
         static void Poll()
         {
             if (UnityEditor.SessionState.GetBool(PlayRunKey, false))
@@ -71,6 +84,8 @@ namespace ImmersiveX.Editor
                 return;
 
             var command = File.ReadAllText(CommandFile).Trim();
+            if (command.Length == 0)
+                return; // caught between the writer creating the file and writing it; read it next time
             File.Delete(CommandFile);
             try
             {
@@ -94,6 +109,10 @@ namespace ImmersiveX.Editor
                 case "refresh":
                     AssetDatabase.Refresh();
                     WriteResult(command, "ok", "Refresh requested; scripts recompile if anything changed.");
+                    break;
+                case "resolve":
+                    UnityEditor.PackageManager.Client.Resolve();
+                    WriteResult(command, "ok", "Package resolve requested (picks up new or changed packages and manifest.json).");
                     break;
                 case "play":
                     StartPlayRun(command, float.TryParse(argument, out var seconds) ? seconds : 20f);
@@ -160,7 +179,10 @@ namespace ImmersiveX.Editor
                     WriteResult(command, EditorApplication.ExecuteMenuItem(argument) ? "ok" : "error", argument);
                     break;
                 default:
-                    WriteResult(command, "error", "Unknown command. See EditorAutomation's documentation for the list.");
+                    if (Commands.TryGetValue(verb, out var handler))
+                        handler(command, argument);
+                    else
+                        WriteResult(command, "error", "Unknown command. See EditorAutomation's documentation for the list.");
                     break;
             }
         }
@@ -169,25 +191,33 @@ namespace ImmersiveX.Editor
         {
             if (!EditorApplication.isPlaying)
                 throw new InvalidOperationException("Not in Play mode. Send 'play 0' first.");
-            var panel = UnityEngine.Object.FindAnyObjectByType<Diagnostics.DeviceCheckPanel>();
-            if (panel == null)
-                throw new InvalidOperationException("No Device Check Panel in the scene.");
+            var session = ImmersiveXSession.Instance;
+            if (session == null)
+                throw new InvalidOperationException("No ImmersiveX Session in the scene.");
 
             switch (action)
             {
                 case "rescan":
-                case "spacesetup": panel.RescanRoom(); break;
-                case "forget": panel.ForgetRoom(); break;
-                case "showarea": panel.ShowWalkableArea(); break;
-                case "scandone": ImmersiveXSession.Instance?.FinishGuidedScan(); break;
-                case "scanskip": ImmersiveXSession.Instance?.SkipGuidedScan(); break;
-                case "saveanchor": panel.SaveAnchor(); break;
-                case "loadanchor": panel.LoadAnchor(); break;
-                case "eraseanchor": panel.EraseAnchor(); break;
+                case "spacesetup": session.RescanRoom(); break;
+                case "forget": session.ForgetRoom(); break;
+                case "showarea": session.ShowWalkableArea(); break;
+                case "scandone": session.FinishGuidedScan(); break;
+                case "scanskip": session.SkipGuidedScan(); break;
+                case "saveanchor": Panel().SaveAnchor(); break;
+                case "loadanchor": Panel().LoadAnchor(); break;
+                case "eraseanchor": Panel().EraseAnchor(); break;
                 default: throw new ArgumentException($"Unknown action '{action}'.");
             }
 
             WriteResult(command, "ok", $"Invoked {action}. Session: {ImmersiveXSession.Instance?.State}. Room: {ImmersiveXSession.Instance?.RoomStatus}");
+        }
+
+        static Diagnostics.DeviceCheckPanel Panel()
+        {
+            var panel = UnityEngine.Object.FindAnyObjectByType<Diagnostics.DeviceCheckPanel>();
+            if (panel == null)
+                throw new InvalidOperationException("No Device Check Panel in the scene.");
+            return panel;
         }
 
         static void StartTurn(string command, string argument)
