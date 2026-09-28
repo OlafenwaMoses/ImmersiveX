@@ -16,8 +16,8 @@ namespace ImmersiveX.Media.Editor
         public const string XperienceStreamUrl = "https://genxr-streaming-media.sfo3.cdn.digitaloceanspaces.com/demos/3-5d-xperience/stream.json";
 
         /// <summary>
-        /// A 4D Gaussian-splat capture of a cartoon zebra, bundled inside the app (StreamingAssets) so it plays offline. Made
-        /// by <c>tools/content/splat_sequence_to_stream.py</c>; see docs/media.md.
+        /// A 4D Gaussian-splat capture of a cartoon zebra, bundled inside the app (StreamingAssets) so it plays offline.
+        /// Packed from its .ply frames with ImmersiveX ▸ Media ▸ Add Media… (see docs/media.md).
         /// </summary>
         public const string ZebraSource = "ImmersiveXContent/Zebra/stream.json";
 
@@ -65,8 +65,8 @@ namespace ImmersiveX.Media.Editor
             serialized.FindProperty("_parallelDownloads").intValue = 8;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             if (!File.Exists(Path.Combine(Application.streamingAssetsPath, ZebraSource)))
-                ImmersiveXLog.Warn($"The zebra isn't in StreamingAssets yet. Make it with: python3 tools/content/splat_sequence_to_stream.py " +
-                                   "research/atlux_ue_zebra_4dgs_ply Assets/StreamingAssets/ImmersiveXContent/Zebra --fps 30 --title Zebra");
+                ImmersiveXLog.Warn("The zebra isn't in StreamingAssets yet: pack its .ply frames with ImmersiveX ▸ Media ▸ Add Media… " +
+                                   "(title Zebra, 30 fps), or send the automation command 'media pack 30 title=Zebra research/atlux_ue_zebra_4dgs_ply'.");
 
             EditorSceneManager.SaveScene(SceneManager.GetActiveScene(), XperienceScenePath);
             ImmersiveXLog.Info($"Created {XperienceScenePath} (first scene in the build).");

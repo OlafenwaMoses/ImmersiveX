@@ -19,9 +19,9 @@ namespace ImmersiveX.Media
         Model,
         Mesh,
         Sequence,
-        Video,
-        Video360,
-        Video180,
+        [InspectorName("Flat video or photo")] Video,
+        [InspectorName("360° video or photo")] Video360,
+        [InspectorName("180° video or photo")] Video180,
     }
 
     public enum MediaPlacement
@@ -34,14 +34,15 @@ namespace ImmersiveX.Media
     /// Plays any supported media in the user's room with one component: set <see cref="Source"/> and the format is
     /// detected and the right player attached, all with the same acrylic controls.
     /// <list type="bullet">
-    /// <item>GenXR 3.5D holograms (<c>stream.json</c>), Gaussian splats (<c>.ply .splat .spz .ksplat</c>), point clouds
-    /// (<c>.ply</c>), models (<c>.glb .gltf</c>), meshes (<c>.obj .ply</c>), frame sequences (a sequence <c>.json</c> or a
-    /// folder), and video (<c>.mp4 .webm .mov</c>: flat, 180° or 360°).</item>
+    /// <item>GenXR 3.5D holograms and packed 4D splat captures (<c>stream.json</c>), Gaussian splats
+    /// (<c>.ply .splat .spz .ksplat</c>), point clouds (<c>.ply</c>), models (<c>.glb .gltf</c>, including Draco and KTX2),
+    /// meshes (<c>.obj .ply .stl</c>), frame sequences (a sequence <c>.json</c> or a folder of frames), video
+    /// (<c>.mp4 .m4v .mov .webm</c>) and photos (<c>.jpg .png</c>): flat, 180° or 360°, mono or stereo.</item>
     /// <item>Standing media is fitted to <see cref="Height"/> with its feet on the floor, at the centre of the mapped room,
     /// facing the user. Grab it to slide it across the floor; it turns about the up axis only.</item>
     /// <item>It moves only when the user moves it. Where it's put is kept with a spatial anchor (see
     /// <see cref="ContentAnchor"/>), so it stays in the same real spot when the headset comes off and after a relaunch.</item>
-    /// <item>Flat video is an upright screen; 180°/360° video surrounds the user.</item>
+    /// <item>Flat video and photos are an upright screen; 180°/360° video and photos surround the user.</item>
     /// <item>It waits, paused, for the Play button unless <c>Play On Start</c> is set.</item>
     /// </list>
     /// </summary>
@@ -57,8 +58,11 @@ namespace ImmersiveX.Media
         [SerializeField, Tooltip("A URL, a file path, or a path inside StreamingAssets. See the component's documentation for the formats.")]
         string _source = string.Empty;
 
-        [SerializeField, Tooltip("Auto detects the format. Set it if detection guesses wrong, e.g. a 360° video with no hint in its name.")]
+        [SerializeField, Tooltip("Auto detects the format. Set it if detection guesses wrong, e.g. a 360° video or photo with no hint in its name.")]
         MediaFormat _format = MediaFormat.Auto;
+
+        [SerializeField, Tooltip("360°/180° video and photos: how the frame is split between the eyes. Auto reads the file name (_tb, _sbs…), then the shape: a square 360° frame is top-bottom, a 2:1 180° frame side-by-side.")]
+        StereoLayout _stereo = StereoLayout.Auto;
 
         [SerializeField, Tooltip("Shown in logs.")]
         string _title = string.Empty;
@@ -72,6 +76,9 @@ namespace ImmersiveX.Media
 
         [SerializeField, Range(0f, 1f)]
         float _volume = 0.8f;
+
+        [SerializeField, Min(0f), Tooltip("Frames per second for a folder of frames or a sequence file. 0 keeps the sequence file's rate (30 for a folder).")]
+        float _frameRate;
 
         [Header("Size and placement")]
         [SerializeField, Min(0.3f), Tooltip("Height of standing media (holograms, splats, models, meshes) in metres; the width follows the content.")]
@@ -376,6 +383,8 @@ namespace ImmersiveX.Media
                 Loop = _loop,
                 Quality = _quality,
                 Up = _up,
+                Stereo = _stereo,
+                FrameRate = _frameRate,
                 MaxGaussians = _maxGaussians > 0 ? _maxGaussians : DefaultMaxGaussians,
                 ParallelDownloads = _parallelDownloads,
                 BufferSeconds = _bufferSeconds,

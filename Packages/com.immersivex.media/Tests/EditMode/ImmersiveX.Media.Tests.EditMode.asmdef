@@ -4,6 +4,7 @@
   "references": [
     "ImmersiveX.Core",
     "ImmersiveX.Media",
+    "ImmersiveX.Media.Editor",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],

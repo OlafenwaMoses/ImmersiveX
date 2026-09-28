@@ -101,9 +101,12 @@ namespace ImmersiveX.Media
         }
 
         /// <summary>Download an image (PNG or JPG) as a texture, decoded off the main thread.</summary>
-        public static IEnumerator FetchTexture(string url, Action<Texture2D, string> done)
+        public static IEnumerator FetchTexture(string url, Action<Texture2D, string> done, bool mipmaps = false)
         {
-            using (var request = UnityWebRequestTexture.GetTexture(url, nonReadable: true))
+            var parameters = DownloadedTextureParams.Default;
+            parameters.readable = false;
+            parameters.mipmapChain = mipmaps;
+            using (var request = UnityWebRequestTexture.GetTexture(url, parameters))
             {
                 request.timeout = 60;
                 yield return request.SendWebRequest();

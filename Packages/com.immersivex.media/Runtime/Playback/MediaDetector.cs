@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace ImmersiveX.Media
@@ -15,6 +16,7 @@ namespace ImmersiveX.Media
         Mesh,
         Sequence,
         Video,
+        Image,
         Codec,
     }
 
@@ -33,6 +35,9 @@ namespace ImmersiveX.Media
 
         /// <summary>The file's bytes when detection had to read it (PLY and JSON), or null.</summary>
         public byte[] Bytes;
+
+        /// <summary>For a folder source: the names of the files in it.</summary>
+        public string[] FolderFiles;
 
         /// <summary>For <see cref="MediaKind.Codec"/>: the registered codec that plays it.</summary>
         public IMediaCodec Codec;
@@ -75,12 +80,32 @@ namespace ImmersiveX.Media
     /// </summary>
     public static class MediaDetector
     {
-        /// <summary>Formats that need a vendor plug-in, and which one.</summary>
-        static readonly Dictionary<string, string> VendorFormats = new Dictionary<string, string>
+        /// <summary>Formats ImmersiveX doesn't play itself, and what to do with them.</summary>
+        static readonly Dictionary<string, string> KnownFormats = BuildKnownFormats();
+
+        static Dictionary<string, string> BuildKnownFormats()
         {
-            { ".4ds", "4DViews (.4ds) needs the 4DViews Unity plugin and an ImmersiveX codec adapter for it." },
-            { ".oms", "Arcturus (.oms) needs the Arcturus HoloSuite Unity player and an ImmersiveX codec adapter for it." },
-        };
+            var known = new Dictionary<string, string>
+            {
+                { ".4ds", "4DViews (.4ds) needs the 4DViews Unity plugin and an ImmersiveX codec adapter for it." },
+                { ".oms", "Arcturus (.oms) needs the Arcturus HoloSuite Unity player and an ImmersiveX codec adapter for it." },
+                { ".vols", "Volograms (.vols) needs an ImmersiveX codec adapter; export the capture as a mesh sequence (OBJ or PLY frames) instead." },
+                { ".sog", "PlayCanvas SOG isn't supported; export .ply, compressed .ply or .spz from SuperSplat instead." },
+                { ".splatv", "splaTV 4D splats aren't supported; export the frames as .ply and pack them with ImmersiveX ▸ Media ▸ Add Media…." },
+            };
+            void Add(string hint, params string[] extensions)
+            {
+                foreach (var extension in extensions)
+                    known[extension] = hint;
+            }
+
+            Add("Point clouds need to be PLY: convert it, for example with CloudCompare (File ▸ Save as ▸ PLY).", ".pcd", ".las", ".laz", ".e57", ".xyz", ".pts");
+            Add("This format can't load while the app runs. Import it into Unity and use right-click ▸ ImmersiveX ▸ Make Immersive, or export glTF/GLB (e.g. from Blender).",
+                ".fbx", ".blend", ".usdz", ".usd", ".usda", ".usdc", ".dae", ".3ds", ".max", ".ma", ".mb", ".c4d");
+            Add("Photos need to be JPG or PNG: convert it first.", ".heic", ".heif", ".webp", ".avif", ".hdr", ".exr", ".tif", ".tiff", ".bmp", ".gif", ".tga", ".psd");
+            Add("Video needs to be MP4, MOV or WebM: re-encode it, e.g. ffmpeg -i in.mkv -c:v libx264 -c:a aac out.mp4.", ".mkv", ".avi", ".wmv", ".flv", ".mpg", ".mpeg", ".ts", ".3gp");
+            return known;
+        }
 
         public static IEnumerator Detect(string url, MediaFormat requested, Action<MediaDetection> done)
         {
@@ -95,16 +120,38 @@ namespace ImmersiveX.Media
                 yield break;
             }
 
-            if (requested != MediaFormat.Auto)
+            // A folder: a stream or sequence file in it plays; otherwise its numbered frames are a sequence.
+            if (detection.Extension.Length == 0 || MediaSource.TryLocalFolder(url, out _))
             {
-                detection.Kind = KindOf(requested);
-                done(detection);
-                yield break;
+                string[] files = null;
+                yield return MediaFolders.List(url, listed => files = listed);
+                if (files != null)
+                {
+                    var manifest = files.FirstOrDefault(f => f.Equals("stream.json", StringComparison.OrdinalIgnoreCase))
+                                   ?? files.FirstOrDefault(f => f.Equals("sequence.json", StringComparison.OrdinalIgnoreCase));
+                    if (manifest != null)
+                    {
+                        yield return Detect(MediaSource.Relative(url.TrimEnd('/') + "/", manifest), requested, done);
+                        yield break;
+                    }
+
+                    detection.Kind = MediaKind.Sequence;
+                    detection.FolderFiles = files;
+                    done(detection);
+                    yield break;
+                }
+
+                if (detection.Extension.Length == 0)
+                {
+                    detection.Error = $"'{MediaSource.FileName(url)}' has no file extension and isn't a folder of media (was it copied into StreamingAssets?).";
+                    done(detection);
+                    yield break;
+                }
             }
 
-            if (MediaSource.TryLocalFolder(url, out _))
+            if (requested != MediaFormat.Auto)
             {
-                detection.Kind = MediaKind.Sequence;
+                detection.Kind = KindOf(requested, detection.Extension);
                 done(detection);
                 yield break;
             }
@@ -143,6 +190,7 @@ namespace ImmersiveX.Media
                     break;
 
                 case ".obj":
+                case ".stl":
                     detection.Kind = MediaKind.Mesh;
                     break;
 
@@ -153,22 +201,28 @@ namespace ImmersiveX.Media
                     detection.Kind = MediaKind.Video;
                     break;
 
+                case ".jpg":
+                case ".jpeg":
+                case ".png":
+                    detection.Kind = MediaKind.Image;
+                    break;
+
                 case ".m3u8":
                 case ".mpd":
                     detection.Error = "Live streaming (HLS/DASH) isn't supported by Unity's video player; use a progressive MP4 or WebM over HTTPS.";
                     break;
 
                 default:
-                    detection.Error = VendorFormats.TryGetValue(detection.Extension, out var vendor)
-                        ? vendor
-                        : $"'{MediaSource.FileName(url)}' isn't a format ImmersiveX Media plays.";
+                    detection.Error = KnownFormats.TryGetValue(detection.Extension, out var hint)
+                        ? $"'{MediaSource.FileName(url)}': {hint}"
+                        : $"'{MediaSource.FileName(url)}' isn't a format ImmersiveX Media plays (docs/media.md lists them).";
                     break;
             }
 
             done(detection);
         }
 
-        static MediaKind KindOf(MediaFormat format)
+        static MediaKind KindOf(MediaFormat format, string extension)
         {
             switch (format)
             {
@@ -178,7 +232,20 @@ namespace ImmersiveX.Media
                 case MediaFormat.Model: return MediaKind.Model;
                 case MediaFormat.Mesh: return MediaKind.Mesh;
                 case MediaFormat.Sequence: return MediaKind.Sequence;
-                default: return MediaKind.Video;
+                default: return IsImage(extension) ? MediaKind.Image : MediaKind.Video; // flat, 360° or 180°: a photo or a video
+            }
+        }
+
+        static bool IsImage(string extension)
+        {
+            switch (extension)
+            {
+                case ".jpg":
+                case ".jpeg":
+                case ".png":
+                    return true;
+                default:
+                    return false;
             }
         }
 
