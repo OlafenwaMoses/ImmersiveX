@@ -151,9 +151,7 @@ A 4D Gaussian-splat capture (4DGS) is a folder of splat frames, usually standard
 - **Tests:** the format EditMode tests decode each sample and check that orientation. Without the samples, those tests are skipped.
 - **Trying one:** in Play mode, send `media open ImmersiveXSamples/<file>` to play it, or set it as an Immersive Media's Source.
 
-**ImmersiveX ▸ Demos ▸ 3.5D Xperience** builds the demo scene, the first scene in the build:
-- GenXR's streamed hologram, at the centre of the room;
-- the bundled 4D zebra beside it, at its captured size (1.35 m).
+**ImmersiveX ▸ Demos ▸ 3.5D Xperience** builds the demo scene, the first scene in the build: GenXR's streamed hologram, at the centre of the room. Add bundled content to it with Add Media; that content stays local (it's git-ignored), so keep those scene changes out of commits.
 
 ## Automation
 With the editor open (see [CONTRIBUTING](../CONTRIBUTING.md#driving-the-open-editor-automation)):

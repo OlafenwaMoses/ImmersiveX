@@ -79,7 +79,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - **Sound:** Android MediaPlayer on Meta Quest (`IStreamAudioProvider`). It's the clock for streams and sequences.
   - **Vendor formats:** `IMediaCodec` is a plug-in point for them (4DViews, Arcturus), which need their own SDKs.
   - **Samples:** `tools/samples/make_media_samples.py` generates a 5 MB test sample of every format (git-ignored, not committed), all showing one asymmetric test figure. EditMode tests decode each one and check its orientation; they're skipped when the samples haven't been made.
-  - **Demo scene:** **ImmersiveX ▸ Demos ▸ 3.5D Xperience**, the first scene in the build: GenXR's streamed hologram, and the bundled 4D zebra beside it.
+  - **Demo scene:** **ImmersiveX ▸ Demos ▸ 3.5D Xperience** (GenXR's streamed hologram), the first scene in the build. Bundled content such as a 4D capture is added locally with Add Media; it isn't committed.
   - **Bundled 4D content:**
     - A 4D Gaussian-splat capture (a folder of 3DGS `.ply` frames) is packed into a hologram stream that ships inside the app and plays offline, at 17 bytes a Gaussian (now by Add Media; see D4).
     - A stream's `stream.json` can carry one `fit` for the whole clip, so a character keeps its size when it raises an arm.
