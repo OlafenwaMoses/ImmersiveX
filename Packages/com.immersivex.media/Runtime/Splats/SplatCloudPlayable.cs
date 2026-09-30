@@ -59,7 +59,7 @@ namespace ImmersiveX.Media
                 yield break;
 
             var extension = _detection.Extension;
-            var task = SplatPacker.PackAsync(() => SplatDecoders.Decode(bytes, extension), context.Up, context.MaxGaussians);
+            var task = SplatPacker.PackAsync(() => SplatDecoders.Decode(bytes, extension), context.Up, context.MaxGaussians, dropFarBackground: true);
             while (!task.IsCompleted)
                 yield return null;
             if (task.IsFaulted)
@@ -69,6 +69,8 @@ namespace ImmersiveX.Media
             }
 
             _packed = task.Result;
+            if (_packed.Background > 0)
+                ImmersiveXLog.Info($"Splats: left out {_packed.Background:N0} far-background splats (a scan's sky or surroundings) so the capture stands in the room.");
             var header = _packed.Header;
             if (header.Count == 0)
             {

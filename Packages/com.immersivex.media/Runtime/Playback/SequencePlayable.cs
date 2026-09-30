@@ -6,8 +6,8 @@ using UnityEngine;
 namespace ImmersiveX.Media
 {
     /// <summary>
-    /// A frame sequence (a sequence JSON or a local folder): reads it, looks at the first frame, and hands over to the mesh
-    /// player (OBJ, mesh PLY) or the splat player (splat and point-cloud PLY, .splat, .spz, .ksplat).
+    /// A frame sequence (a sequence JSON or a folder of frames): reads it, looks at the first frame, and hands over to the
+    /// mesh player (OBJ, mesh PLY, STL) or the splat player (splat and point-cloud PLY, .splat, .spz, .ksplat).
     /// </summary>
     sealed class SequencePlayable : IMediaPlayable
     {
@@ -33,9 +33,7 @@ namespace ImmersiveX.Media
             MediaSequence sequence;
             try
             {
-                sequence = MediaSource.TryLocalFolder(context.Url, out var folder)
-                    ? MediaSequence.FromFolder(folder)
-                    : null;
+                sequence = _detection.FolderFiles != null ? MediaSequence.FromFiles(context.Url, _detection.FolderFiles) : null;
             }
             catch (Exception exception)
             {
@@ -65,8 +63,11 @@ namespace ImmersiveX.Media
                 }
             }
 
-            // Meshes or splats? OBJ is a mesh; a PLY frame says in its header; the rest are splats.
-            var mesh = sequence.Extension == ".obj";
+            if (context.FrameRate > 0f)
+                sequence.Fps = context.FrameRate;
+
+            // Meshes or splats? OBJ and STL are meshes; a PLY frame says in its header; the rest are splats.
+            var mesh = sequence.Extension == ".obj" || sequence.Extension == ".stl";
             byte[] first = null;
             if (sequence.Extension == ".ply")
             {

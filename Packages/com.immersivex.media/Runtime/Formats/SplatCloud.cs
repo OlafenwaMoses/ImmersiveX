@@ -94,6 +94,54 @@ namespace ImmersiveX.Media
         }
 
         /// <summary>A copy of only the <paramref name="keep"/> most visible splats (opacity × size), in their original order.</summary>
+        /// <summary>
+        /// Without the far background: splats more than three times the 90th-percentile distance from the centre, like an
+        /// outdoor scan's sky shell. The capture then stands in the room like an object instead of being drawn as a bubble
+        /// around it. Returns this cloud when nothing is that far out.
+        /// </summary>
+        public SplatCloud WithoutFarBackground(out int dropped)
+        {
+            dropped = 0;
+            if (Count < 1000)
+                return this;
+
+            // The median centre and the 90th-percentile distance, from a sample.
+            var step = Mathf.Max(1, Count / 100_000);
+            var samples = (Count + step - 1) / step;
+            var axis = new float[samples];
+            var centre = Vector3.zero;
+            for (var k = 0; k < 3; k++)
+            {
+                for (int i = 0, s = 0; i < Count; i += step, s++)
+                    axis[s] = Positions[i * 3 + k];
+                System.Array.Sort(axis);
+                centre[k] = axis[samples / 2];
+            }
+
+            for (int i = 0, s = 0; i < Count; i += step, s++)
+                axis[s] = (new Vector3(Positions[i * 3], Positions[i * 3 + 1], Positions[i * 3 + 2]) - centre).sqrMagnitude;
+            System.Array.Sort(axis);
+            var cutoff = 9f * axis[(int)(samples * 0.9f)]; // (3 × the 90th-percentile distance)², in squared units
+
+            var keep = new bool[Count];
+            var kept = 0;
+            for (var i = 0; i < Count; i++)
+            {
+                keep[i] = (new Vector3(Positions[i * 3], Positions[i * 3 + 1], Positions[i * 3 + 2]) - centre).sqrMagnitude <= cutoff;
+                if (keep[i])
+                    kept++;
+            }
+
+            dropped = Count - kept;
+            if (dropped == 0)
+                return this;
+            var result = new SplatCloud(kept) { Up = Up };
+            for (int i = 0, j = 0; i < Count; i++)
+                if (keep[i])
+                    CopyTo(i, result, j++);
+            return result;
+        }
+
         public SplatCloud Strongest(int keep)
         {
             if (keep <= 0 || keep >= Count)

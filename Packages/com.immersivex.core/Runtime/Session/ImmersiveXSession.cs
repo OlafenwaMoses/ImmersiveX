@@ -242,9 +242,10 @@ namespace ImmersiveX
                 var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
                 var tracked = (head.isValid && head.TryGetFeatureValue(CommonUsages.isTracked, out var isTracked) && isTracked) ||
                               ARSession.state == ARSessionState.SessionTracking;
-                if (Application.isFocused)
+                var focused = Application.isFocused || Application.isEditor; // on a device, unfocused means a system overlay is up
+                if (focused)
                     waitedWhileFocused += Time.unscaledDeltaTime;
-                stableFor = tracked && Application.isFocused ? stableFor + Time.unscaledDeltaTime : 0f;
+                stableFor = tracked && focused ? stableFor + Time.unscaledDeltaTime : 0f;
                 if (stableFor >= TrackingSettleSeconds)
                     yield break;
                 yield return null;

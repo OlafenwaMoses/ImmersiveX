@@ -13,6 +13,8 @@ namespace ImmersiveX.Media
         static Material _splats;
         static Material _panorama;
         static Material _mesh;
+        static Material _meshLit;
+        static Material _photoTransparent;
 
         /// <summary>Gaussian splats (holograms, splat files, point clouds).</summary>
         public static Material SplatMaterial => _splats != null ? _splats : _splats = Load("HologramSplats");
@@ -22,6 +24,12 @@ namespace ImmersiveX.Media
 
         /// <summary>Unlit meshes with a texture and/or vertex colours (volumetric capture, scans).</summary>
         public static Material MeshMaterial => _mesh != null ? _mesh : _mesh = Load("VolumetricUnlit");
+
+        /// <summary>Lit meshes for models with plain material colours and no texture or vertex colours (OBJ, PLY, STL).</summary>
+        public static Material MeshLitMaterial => _meshLit != null ? _meshLit : _meshLit = Load("MeshLit");
+
+        /// <summary>Flat photos with transparency (PNG).</summary>
+        public static Material PhotoTransparentMaterial => _photoTransparent != null ? _photoTransparent : _photoTransparent = Load("PhotoTransparent");
 
         static Material Load(string name)
         {
@@ -37,6 +45,8 @@ namespace ImmersiveX.Media
             _splats = null;
             _panorama = null;
             _mesh = null;
+            _meshLit = null;
+            _photoTransparent = null;
         }
     }
 }

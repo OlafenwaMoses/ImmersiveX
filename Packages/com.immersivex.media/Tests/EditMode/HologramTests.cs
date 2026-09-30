@@ -52,6 +52,22 @@ namespace ImmersiveX.Media.Tests
             Assert.AreEqual("https://cdn.example.com/demos/show/tiers/base/000002.bin", manifest.FrameUrl(tier, 2));
             Assert.AreEqual("full", manifest.Tiers[manifest.Tiers.Count - 1].Name);
             Assert.AreEqual(manifest.Tiers[0], manifest.FindTier("missing"), "an unknown tier falls back to the smallest");
+            Assert.IsNull(manifest.Fit, "fitted per frame unless the stream says otherwise");
+        }
+
+        [Test]
+        public void Manifest_BundledClipKeepsOneFitAndPlaysFromInsideTheApp()
+        {
+            var json = ManifestJson.Replace(@"""base_url"": null,", @"""base_url"": null, ""fit"": { ""centre_x"": -0.02, ""centre_z"": -0.06, ""top"": -1.35, ""bottom"": 0.003 },")
+                .Replace(@"""audio"": { ""file"": ""audio.m4a"", ""codec"": ""aac"" },", @"""audio"": null,");
+            var manifest = HologramManifest.Parse(json, "jar:file:///data/app/genxr.immersivex.app/base.apk!/assets/ImmersiveXContent/Zebra/stream.json");
+
+            Assert.IsTrue(manifest.Fit.HasValue);
+            Assert.AreEqual(1.353f, manifest.Fit.Value.Height, 1e-4f);
+            Assert.AreEqual(-0.02f, manifest.Fit.Value.CentreX, 1e-6f);
+            Assert.IsNull(manifest.AudioUrl, "no soundtrack: the frame clock plays it");
+            Assert.AreEqual("jar:file:///data/app/genxr.immersivex.app/base.apk!/assets/ImmersiveXContent/Zebra/tiers/base/000001.bin",
+                manifest.FrameUrl(manifest.FindTier("base"), 1));
         }
 
         [Test]

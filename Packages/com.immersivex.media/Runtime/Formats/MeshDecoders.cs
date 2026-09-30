@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using UnityEngine;
 
@@ -25,13 +26,35 @@ namespace ImmersiveX.Media
 
         public string Material;
 
+        /// <summary>
+        /// OBJ with several materials: the triangles of each (usemtl groups, in order of first use). Null when the whole
+        /// mesh uses one material; <see cref="Triangles"/> always holds every triangle.
+        /// </summary>
+        public MeshPart[] Parts;
+
         public Bounds Bounds;
     }
 
+    /// <summary>The triangles that use one material.</summary>
+    public sealed class MeshPart
+    {
+        public string Material;
+        public int[] Triangles;
+    }
+
+    /// <summary>One MTL material: diffuse colour (Kd), diffuse texture (map_Kd) and opacity (d, or 1 − Tr).</summary>
+    public sealed class MtlMaterial
+    {
+        public Color Diffuse = Color.white;
+        public string Texture;
+        public float Opacity = 1f;
+    }
+
     /// <summary>
-    /// Decodes OBJ (with MTL texture names and the "v x y z r g b" vertex-colour extension) and PLY meshes (vertex colours,
-    /// per-vertex s/t or u/v, per-face texcoords, MeshLab "TextureFile" comments). Source files are right-handed; they're
-    /// converted to Unity's left-handed frame with the model's front (+Z) facing the viewer.
+    /// Decodes OBJ (several materials, MTL colours and textures, and the "v x y z r g b" vertex-colour extension), PLY meshes
+    /// (vertex colours, per-vertex s/t or u/v, per-face texcoords, MeshLab "TextureFile" comments) and STL (binary and
+    /// ASCII). Source files are right-handed; they're converted to Unity's left-handed frame with the model's front (+Z)
+    /// facing the viewer.
     /// </summary>
     public static class MeshDecoders
     {
@@ -41,6 +64,7 @@ namespace ImmersiveX.Media
             {
                 case ".obj": return Obj(Encoding.UTF8.GetString(data), up);
                 case ".ply": return Ply(data, PlyFile.Parse(data), up);
+                case ".stl": return Stl(data, up);
                 default: throw new FormatException($"'{extension}' isn't a mesh format.");
             }
         }
@@ -61,6 +85,10 @@ namespace ImmersiveX.Media
             var polygon = new List<int>(8);
             string material = null;
             var hasColour = false;
+            var partNames = new List<string>();
+            var groups = new Dictionary<string, List<int>>();
+            var current = string.Empty;
+            List<int> currentTriangles;
 
             foreach (var raw in text.Split('\n'))
             {
@@ -87,7 +115,9 @@ namespace ImmersiveX.Media
                         uvs.Add(new Vector2(F(parts[1]), parts.Length > 2 ? F(parts[2]) : 0f));
                         break;
                     case "usemtl":
-                        material ??= parts.Length > 1 ? parts[1] : null;
+                        var name = parts.Length > 1 ? line.Substring(parts[0].Length).Trim() : string.Empty;
+                        material ??= name.Length > 0 ? name : null;
+                        current = name;
                         break;
                     case "f":
                         polygon.Clear();
@@ -109,17 +139,25 @@ namespace ImmersiveX.Media
                             polygon.Add(corner);
                         }
 
+                        if (!groups.TryGetValue(current, out currentTriangles))
+                        {
+                            groups.Add(current, currentTriangles = new List<int>());
+                            partNames.Add(current);
+                        }
+
                         for (var k = 1; k + 1 < polygon.Count; k++) // fan
                         {
-                            triangles.Add(polygon[0]);
-                            triangles.Add(polygon[k]);
-                            triangles.Add(polygon[k + 1]);
+                            currentTriangles.Add(polygon[0]);
+                            currentTriangles.Add(polygon[k]);
+                            currentTriangles.Add(polygon[k + 1]);
                         }
 
                         break;
                 }
             }
 
+            foreach (var name in partNames)
+                triangles.AddRange(groups[name]);
             if (triangles.Count == 0 && positions.Count > 0)
                 throw new FormatException("The OBJ file has vertices but no faces.");
 
@@ -131,6 +169,7 @@ namespace ImmersiveX.Media
                 Colors = hasColour ? outColours.ToArray() : null,
                 Material = material,
                 MaterialLibrary = MtlLibrary(text),
+                Parts = partNames.Count > 1 ? partNames.ConvertAll(name => new MeshPart { Material = name, Triangles = groups[name].ToArray() }).ToArray() : null,
             };
             ToUnity(frame, up);
             return frame;
@@ -139,23 +178,94 @@ namespace ImmersiveX.Media
         /// <summary>The diffuse texture (map_Kd) of <paramref name="material"/> in MTL text, or the first one.</summary>
         public static string MtlTexture(string mtl, string material)
         {
-            string current = null, first = null;
-            foreach (var raw in mtl.Split('\n'))
+            string first = null;
+            foreach (var pair in Mtl(mtl))
             {
-                var line = raw.Trim();
-                if (line.StartsWith("newmtl ", StringComparison.Ordinal))
-                    current = line.Substring(7).Trim();
-                else if (line.StartsWith("map_Kd ", StringComparison.Ordinal))
-                {
-                    var parts = line.Substring(7).Trim().Split(' ');
-                    var file = parts[parts.Length - 1]; // options like -s come first
-                    first ??= file;
-                    if (material == null || current == material)
-                        return file;
-                }
+                first ??= pair.Value.Texture;
+                if (material != null && pair.Key == material && pair.Value.Texture != null)
+                    return pair.Value.Texture;
             }
 
             return first;
+        }
+
+        /// <summary>The materials in MTL text, by name, in the order they're defined.</summary>
+        public static List<KeyValuePair<string, MtlMaterial>> Mtl(string mtl)
+        {
+            var materials = new List<KeyValuePair<string, MtlMaterial>>();
+            MtlMaterial current = null;
+            foreach (var raw in mtl.Split('\n'))
+            {
+                var line = raw.Trim();
+                var space = line.IndexOfAny(new[] { ' ', '\t' });
+                if (space < 0)
+                    continue;
+                var keyword = line.Substring(0, space);
+                var rest = line.Substring(space + 1).Trim();
+                if (keyword == "newmtl")
+                {
+                    current = new MtlMaterial();
+                    materials.Add(new KeyValuePair<string, MtlMaterial>(rest, current));
+                    continue;
+                }
+
+                if (current == null)
+                    continue;
+                var values = rest.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                switch (keyword)
+                {
+                    case "Kd" when values.Length >= 3:
+                        current.Diffuse = new Color(F(values[0]), F(values[1]), F(values[2]), 1f);
+                        break;
+                    case "d" when values.Length >= 1 && values[0] != "-halo":
+                        current.Opacity = Mathf.Clamp01(F(values[0]));
+                        break;
+                    case "Tr" when values.Length >= 1:
+                        current.Opacity = Mathf.Clamp01(1f - F(values[0]));
+                        break;
+                    case "map_Kd":
+                        current.Texture = TextureFile(values);
+                        break;
+                }
+            }
+
+            return materials;
+        }
+
+        /// <summary>Every texture file an MTL names (diffuse, bump, normal, opacity…), for copying a model with its files.</summary>
+        public static List<string> MtlTextures(string mtl)
+        {
+            var files = new List<string>();
+            foreach (var raw in mtl.Split('\n'))
+            {
+                var parts = raw.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2)
+                    continue;
+                var keyword = parts[0].ToLowerInvariant();
+                if (!keyword.StartsWith("map_", StringComparison.Ordinal) && keyword != "bump" && keyword != "norm" && keyword != "disp" &&
+                    keyword != "decal" && keyword != "refl")
+                    continue;
+                var file = TextureFile(parts.Skip(1).ToArray());
+                if (!string.IsNullOrEmpty(file) && !files.Contains(file))
+                    files.Add(file);
+            }
+
+            return files;
+        }
+
+        /// <summary>The file name at the end of an MTL texture statement, after its options (-s 1 1 1, -clamp on…).</summary>
+        static string TextureFile(string[] values)
+        {
+            var at = 0;
+            while (at < values.Length && values[at].StartsWith("-", StringComparison.Ordinal) && values[at].Length > 1)
+            {
+                var arguments = values[at] == "-o" || values[at] == "-s" || values[at] == "-t" ? 3
+                    : values[at] == "-mm" ? 2
+                    : 1; // -blendu, -blendv, -cc, -clamp, -bm, -boost, -texres, -imfchan
+                at += 1 + arguments;
+            }
+
+            return at < values.Length ? string.Join(" ", values, at, values.Length - at) : null;
         }
 
         /// <summary>The MTL library an OBJ names (mtllib), or null.</summary>
@@ -177,6 +287,48 @@ namespace ImmersiveX.Media
         {
             var index = int.Parse(token, CultureInfo.InvariantCulture);
             return index < 0 ? count + index : index - 1;
+        }
+
+        // ---------------------------------------------------------------- STL
+
+        /// <summary>
+        /// STL (binary or ASCII): triangles only, no colours or textures. Usually z-up, in millimetres; the media is fitted
+        /// to its height anyway.
+        /// </summary>
+        public static MeshFrame Stl(byte[] data, UpAxis up)
+        {
+            var positions = new List<Vector3>();
+            var binaryCount = data.Length >= 84 ? BitConverter.ToUInt32(data, 80) : 0u;
+            if (data.Length >= 84 && 84L + binaryCount * 50L == data.Length)
+            {
+                for (var i = 0; i < binaryCount; i++)
+                {
+                    var at = 84 + i * 50 + 12; // after the facet normal
+                    for (var corner = 0; corner < 3; corner++, at += 12)
+                        positions.Add(new Vector3(BitConverter.ToSingle(data, at), BitConverter.ToSingle(data, at + 4), BitConverter.ToSingle(data, at + 8)));
+                }
+            }
+            else
+            {
+                foreach (var raw in Encoding.ASCII.GetString(data).Split('\n'))
+                {
+                    var line = raw.Trim();
+                    if (!line.StartsWith("vertex", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 4)
+                        positions.Add(new Vector3(F(parts[1]), F(parts[2]), F(parts[3])));
+                }
+            }
+
+            if (positions.Count < 3)
+                throw new FormatException("The STL file has no triangles.");
+            var triangles = new int[positions.Count / 3 * 3];
+            for (var i = 0; i < triangles.Length; i++)
+                triangles[i] = i;
+            var frame = new MeshFrame { Positions = positions.ToArray(), Triangles = triangles };
+            ToUnity(frame, up);
+            return frame;
         }
 
         // ---------------------------------------------------------------- PLY
@@ -356,14 +508,21 @@ namespace ImmersiveX.Media
                 }
             }
 
-            var t = frame.Triangles;
-            for (var i = 0; i + 2 < t.Length; i += 3)
-                (t[i + 1], t[i + 2]) = (t[i + 2], t[i + 1]);
+            FlipWinding(frame.Triangles);
+            if (frame.Parts != null)
+                foreach (var part in frame.Parts)
+                    FlipWinding(part.Triangles);
 
             var bounds = new Bounds(p.Length > 0 ? p[0] : Vector3.zero, Vector3.zero);
             for (var i = 1; i < p.Length; i++)
                 bounds.Encapsulate(p[i]);
             frame.Bounds = bounds;
+        }
+
+        static void FlipWinding(int[] t)
+        {
+            for (var i = 0; i + 2 < t.Length; i += 3)
+                (t[i + 1], t[i + 2]) = (t[i + 2], t[i + 1]);
         }
 
         static float F(string token) => float.Parse(token, NumberStyles.Float, CultureInfo.InvariantCulture);

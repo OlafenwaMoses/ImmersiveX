@@ -108,7 +108,7 @@ namespace ImmersiveX
         {
             if (Space == null)
                 return;
-            RoomPlacements.ForgetRoom(); // where things were put in it goes too
+            ContentAnchor.EraseSaved(RoomPlacements.ForgetRoom()); // where things were put in it goes too, with their anchors
             _library.Delete(Space.Id);
             ImmersiveXLog.Info($"Forgot {Space.Name}.");
             Space = null;

@@ -19,6 +19,8 @@ namespace ImmersiveX.Media.Editor
             ("HologramSplats", "ImmersiveX/Hologram Splats", null),
             ("Panorama", "ImmersiveX/Panorama", null),
             ("VolumetricUnlit", "ImmersiveX/Volumetric Unlit", null),
+            ("MeshLit", "Universal Render Pipeline/Simple Lit", null),
+            ("PhotoTransparent", "Universal Render Pipeline/Unlit", new[] { "_SURFACE_TYPE_TRANSPARENT" }),
             ("glTF/Metallic", "Shader Graphs/glTF-pbrMetallicRoughness", null),
             ("glTF/MetallicEmissive", "Shader Graphs/glTF-pbrMetallicRoughness", new[] { "_EMISSIVE" }),
             ("glTF/MetallicOcclusion", "Shader Graphs/glTF-pbrMetallicRoughness", new[] { "_OCCLUSION" }),
@@ -53,12 +55,36 @@ namespace ImmersiveX.Media.Editor
                 if (keywords != null)
                     foreach (var keyword in keywords)
                         material.EnableKeyword(keyword);
+                Configure(file, material);
                 AssetDatabase.CreateAsset(material, path);
                 if (log)
                     ImmersiveXLog.Info($"Created {path}.");
             }
 
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>Render states the URP shaders take from material properties.</summary>
+        static void Configure(string file, Material material)
+        {
+            switch (file)
+            {
+                case "MeshLit":
+                    material.SetFloat("_Cull", 0f); // both sides: downloaded meshes don't always wind consistently
+                    break;
+                case "PhotoTransparent":
+                    material.SetFloat("_Surface", 1f);
+                    material.SetFloat("_Blend", 0f);
+                    material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    material.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+                    material.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    material.SetFloat("_ZWrite", 0f);
+                    material.SetFloat("_Cull", 0f);
+                    material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                    material.SetOverrideTag("RenderType", "Transparent");
+                    break;
+            }
         }
     }
 }

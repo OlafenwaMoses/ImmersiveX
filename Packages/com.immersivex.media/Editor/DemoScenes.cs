@@ -23,8 +23,8 @@ namespace ImmersiveX.Media.Editor
 
         /// <summary>
         /// Build <c>Assets/Demos/Xperience35D/Xperience35D.unity</c>: the ImmersiveX rig plus Immersive Media streaming the
-        /// 3.5D Xperience at base quality, 1.60 m tall, with media controls. It waits paused for the Play button and plays
-        /// once. It becomes the first scene in the build.
+        /// 3.5D Xperience at base quality, 1.60 m tall, at the centre of the room, with media controls. It waits paused for
+        /// the Play button and plays once. The scene becomes the first in the build. Add more media with Add Media.
         /// </summary>
         public static bool TryCreateXperience()
         {
@@ -39,6 +39,7 @@ namespace ImmersiveX.Media.Editor
             serialized.FindProperty("_height").floatValue = 1.6f;
             serialized.FindProperty("_playOnStart").boolValue = false; // waits for the Play button
             serialized.FindProperty("_loop").boolValue = false;        // plays once; Play starts it again
+            serialized.FindProperty("_spot").intValue = 0;             // the centre of the room
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.SaveScene(SceneManager.GetActiveScene(), XperienceScenePath);

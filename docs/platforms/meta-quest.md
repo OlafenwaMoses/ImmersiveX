@@ -47,7 +47,7 @@ What the simulator can and can't check (Meta XR Simulator 205 with Unity OpenXR:
 | Quest detected, start-up flow, content placement | ✅ | |
 | Passthrough (simulated room behind content) | ✅ | ![](../validation/2026-09-26-meta-xr-simulator-passthrough.png) |
 | Controllers, device panel, frame rate | ✅ | |
-| Save an anchor | ✅ | |
+| Save an anchor | ⚠️ | Only the first save of each run works. Later saves hit the same `xrGetSpaceComponentStatusFB` rejection (checked 2026-09-28); content falls back to the pose saved with the room |
 | Load a saved anchor | ❌ | The simulator rejects `xrGetSpaceComponentStatusFB` (`XR_ERROR_VALIDATION_FAILURE`) and tries cloud discovery |
 | Room planes / furniture | ❌ | Same `xrGetSpaceComponentStatusFB` rejection, so planes are dropped |
 | Space Setup | ❌ | The runtime doesn't offer `XR_FB_scene_capture` |
@@ -106,7 +106,8 @@ Everything marked ❌ is checked on the headset.
 | Hologram (3.5D) | Launch, press **Play** | At the room's centre, 1.6 m tall, with sound; no *Buffering* after the first second |
 | Several pieces of media | A scene with more than one Immersive Media | Each stands in its own spot around the centre, facing you, with its own controls |
 | Handles | Drag the move bar, a turn bar, the resize corner | It slides across the floor, turns only about the up axis, and resizes; the panel follows moves but not turns |
-| Stays put | Move something, quit, relaunch in the same room | It's back where you left it |
+| Stays put | Move, turn and resize something; take the headset off for 10 s and put it back on; quit fully and relaunch | It never moves by itself; after the relaunch it's back where you left it, and the log says `placed at its spatial anchor` |
+| Zebra (4D) | Press **Play** on the zebra with Wi-Fi off | It plays from inside the app: 1.35 m tall, 30 fps, no *Buffering* |
 
 Record results in `docs/validation/`.
 

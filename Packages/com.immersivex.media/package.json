@@ -2,7 +2,7 @@
   "name": "com.immersivex.media",
   "version": "0.1.0",
   "displayName": "ImmersiveX Media",
-  "description": "Plays immersive media in the user's room with one component and the same acrylic controls: GenXR 3.5D hologram streams, Gaussian splats (.ply, .splat, .spz, .ksplat), point clouds, animated glTF/GLB models, OBJ/PLY mesh sequences, and 2D, 180\u00b0 and 360\u00b0 video. The format is detected automatically.",
+  "description": "Plays immersive media in the user's room with one component and the same acrylic controls: GenXR 3.5D hologram streams and 4D splat sequences, Gaussian splats (.ply, .splat, .spz, .ksplat), point clouds, animated glTF/GLB models (including Draco and KTX2 compression), OBJ/PLY/STL meshes and mesh sequences, 2D, 180\u00b0 and 360\u00b0 video, and flat, 180\u00b0 and 360\u00b0 photos. The format is detected automatically.",
   "unity": "6000.3",
   "unityRelease": "23f1",
   "license": "MIT",
@@ -25,6 +25,9 @@
   ],
   "dependencies": {
     "com.immersivex.core": "0.1.0",
-    "com.unity.cloud.gltfast": "6.20.0"
+    "com.unity.cloud.gltfast": "6.20.0",
+    "com.unity.cloud.draco": "5.4.3",
+    "com.unity.cloud.ktx": "3.7.0",
+    "com.unity.meshopt.decompress": "0.2.0-exp.1"
   }
 }

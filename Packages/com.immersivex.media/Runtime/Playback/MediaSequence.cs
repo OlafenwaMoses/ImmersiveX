@@ -9,7 +9,7 @@ namespace ImmersiveX.Media
 {
     /// <summary>
     /// A sequence of frame files played in order: point clouds, splats or meshes (volumetric video as files). Described by
-    /// a small JSON file, or (on desktop) a folder of numbered files:
+    /// a small JSON file, or a folder of numbered files (see <see cref="MediaFolders"/>):
     /// <code>
     /// { "type": "sequence", "fps": 30, "frames": ["frame_0001.ply", "frame_0002.ply"], "audio": "audio.mp3", "up": "+y" }
     /// { "type": "sequence", "fps": 30, "pattern": "frames/frame_{0:D4}.obj", "start": 1, "count": 300 }
@@ -67,21 +67,36 @@ namespace ImmersiveX.Media
             return sequence;
         }
 
-        /// <summary>Numbered .ply/.obj/.splat/.spz/.ksplat files in a local folder, in natural order (desktop only).</summary>
-        public static MediaSequence FromFolder(string folder)
-        {
-            var extensions = new[] { ".ply", ".obj", ".splat", ".spz", ".ksplat" };
-            var files = Directory.GetFiles(folder)
-                .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                .OrderBy(f => NaturalKey(Path.GetFileName(f)), StringComparer.Ordinal)
-                .ToArray();
-            if (files.Length == 0)
-                throw new FormatException($"'{folder}' has no .ply, .obj, .splat, .spz or .ksplat frames.");
+        /// <summary>Frame extensions a folder sequence picks up.</summary>
+        public static readonly string[] FrameExtensions = { ".ply", ".obj", ".stl", ".splat", ".spz", ".ksplat" };
 
-            var sequence = new MediaSequence { Frames = files.Select(f => new Uri(f).AbsoluteUri).ToArray() };
-            var audio = Directory.GetFiles(folder).FirstOrDefault(f => new[] { ".mp3", ".ogg", ".wav", ".m4a" }.Contains(Path.GetExtension(f).ToLowerInvariant()));
+        static readonly string[] AudioExtensions = { ".mp3", ".ogg", ".wav", ".m4a", ".aac" };
+
+        /// <summary>Numbered .ply/.obj/.stl/.splat/.spz/.ksplat files in a local folder, in natural order.</summary>
+        public static MediaSequence FromFolder(string folder) =>
+            FromFiles(new Uri(folder.TrimEnd('/', '\\') + "/").AbsoluteUri, Directory.GetFiles(folder).Select(Path.GetFileName));
+
+        /// <summary>
+        /// The numbered frames among <paramref name="names"/> (files in the folder at <paramref name="folderUrl"/>) in
+        /// natural order (frame_2 before frame_10), with the folder's first sound file as the soundtrack. 30 fps.
+        /// </summary>
+        public static MediaSequence FromFiles(string folderUrl, IEnumerable<string> names)
+        {
+            var all = names.ToArray();
+            var frames = all.Where(n => FrameExtensions.Contains(Path.GetExtension(n).ToLowerInvariant()))
+                .OrderBy(NaturalKey, StringComparer.Ordinal)
+                .ToArray();
+            if (frames.Length == 0)
+                throw new FormatException($"'{MediaSource.FileName(folderUrl)}' has no {string.Join(", ", FrameExtensions)} frames.");
+            var types = frames.Select(f => Path.GetExtension(f).ToLowerInvariant()).Distinct().ToArray();
+            if (types.Length > 1)
+                throw new FormatException($"'{MediaSource.FileName(folderUrl)}' mixes frame types ({string.Join(", ", types)}); keep one kind of frame per folder.");
+
+            var folder = folderUrl.TrimEnd('/') + "/";
+            var sequence = new MediaSequence { Frames = frames.Select(f => folder + Uri.EscapeDataString(f)).ToArray() };
+            var audio = all.FirstOrDefault(n => AudioExtensions.Contains(Path.GetExtension(n).ToLowerInvariant()));
             if (audio != null)
-                sequence.AudioUrl = new Uri(audio).AbsoluteUri;
+                sequence.AudioUrl = folder + Uri.EscapeDataString(audio);
             return sequence;
         }
 

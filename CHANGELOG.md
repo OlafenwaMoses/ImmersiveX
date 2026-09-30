@@ -70,7 +70,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - **Side handles:** a move bar under the controls, turn bars at the sides (about the up axis only) and a resize corner. They work with hands or controllers, by ray or pinch.
   - **Several pieces of media per scene:**
     - the first stands at the centre of the mapped room and the rest around it, each facing the user;
-    - each stays where it was put, because its placement is saved relative to the recognised room (`RoomPlacements`).
+    - each stays where it was put, held by a spatial anchor (see M3 below).
   - **Rendering:**
     - splats of every format go through one URP splat shader (maths matched to GenXR's web player), sorted on worker threads;
     - big scenes keep their most visible splats (400,000 on standalone headsets);
@@ -79,19 +79,55 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - **Sound:** Android MediaPlayer on Meta Quest (`IStreamAudioProvider`). It's the clock for streams and sequences.
   - **Vendor formats:** `IMediaCodec` is a plug-in point for them (4DViews, Arcturus), which need their own SDKs.
   - **Samples:** `tools/samples/make_media_samples.py` generates a 5 MB test sample of every format (git-ignored, not committed), all showing one asymmetric test figure. EditMode tests decode each one and check its orientation; they're skipped when the samples haven't been made.
-  - **Demo scene:** **ImmersiveX ▸ Demos ▸ 3.5D Xperience** (GenXR's streamed hologram), the first scene in the build.
+  - **Demo scene:** **ImmersiveX ▸ Demos ▸ 3.5D Xperience** (GenXR's streamed hologram), the first scene in the build. Bundled content such as a 4D capture is added locally with Add Media; it isn't committed.
+  - **Bundled 4D content:**
+    - A 4D Gaussian-splat capture (a folder of 3DGS `.ply` frames) is packed into a hologram stream that ships inside the app and plays offline, at 17 bytes a Gaussian (now by Add Media; see D4).
+    - A stream's `stream.json` can carry one `fit` for the whole clip, so a character keeps its size when it raises an arm.
+    - The generated content (`Assets/StreamingAssets/ImmersiveXContent/`) is git-ignored because of its size.
   - **Automation:**
     - `media list`, and `media [@n|@name] status|play|pause|toggle|seek|mute|unmute|speaker|volume|turn|move|height|open`;
     - `demo`;
     - `resolve` (re-resolve packages).
 - `WalkableArea.Centre()` and `FloorGrabTransformer` (slide across the floor, turn about the up axis only) in core.
 
+- **Content from the internet, with no code (D4).** Checked against 88 real files from Khronos, PlayCanvas, Niantic, BabylonJS, GaussianSplats3D, Open3D, Stanford, 8i, three.js, videojs, Wikimedia Commons and others, in XR Simulation and the Meta XR Simulator. 20 EditMode tests decode them when the local corpus (`research/web-corpus`, git-ignored) is present.
+  - **ImmersiveX ▸ Media ▸ Add Media…** (and automation `media add`): a file, a folder of frames or a URL is added to the open scene as Immersive Media.
+    - Local content is copied into `StreamingAssets/ImmersiveXContent/<name>/` with the files it needs: an OBJ's MTL and textures, a glTF's buffers and images, a PLY's texture.
+    - A folder of splat frames is packed into a hologram stream. The packer runs in the editor, reuses the player's decoders, handles every splat format and replaces the Python converter; its output is identical.
+  - **Build check:** a build stops when a scene's Immersive Media content isn't in StreamingAssets, has missing frames, or points at a path on this computer. Plain http gets a warning. **ImmersiveX ▸ Media ▸ Check Content in the Build** and `media check` run it on demand.
+  - **Photos:** `.jpg`/`.png`, flat on a screen (PNG transparency kept) or 360°/180° around the user, mono or stereo.
+  - **Stereo setting** on Immersive Media. Once a video or photo is known to be 360° or 180°, its layout is inferred from its shape: a square 360° frame is top-bottom, a 2:1 180° frame is side-by-side (VR180).
+  - **glTF compression:** Draco meshes, `EXT_meshopt_compression` and KTX2 (Basis Universal) textures, through Draco for Unity 5.4.3, KTX for Unity 3.7.0 and Unity's meshopt decompression 0.2.0-exp.1.
+  - **Splat scans:** a scan's far background (an outdoor capture's sky shell) is left out, so the capture stands in the room instead of drawing as a bubble.
+  - **Unsupported formats say what to do:** HDR/EXR/HEIC/WebP, FBX/USDZ/Blend, PCD/LAS, SOG, splatv and MKV/AVI each get a conversion hint. A video that won't decode names the codecs that do.
+  - **Meshes:**
+    - OBJ with several materials: one submesh each, with its MTL colour and texture; texture options and file names with spaces work.
+    - `.stl`, binary and ASCII, z-up.
+    - Parts with only a colour, or none, are lit, so plain models show their shape; textures and vertex colours stay unlit.
+  - **Folder sources everywhere:** a folder of numbered frames plays as a sequence on the headset too, because Android builds get an index of StreamingAssets folders. A folder holding `stream.json` or `sequence.json` plays that file. A **Frame Rate** setting covers captures that don't say.
+
+- **M3 (in progress): content stays put with spatial anchors.** It moves only when the user moves it.
+  - `ContentAnchor`, added by Immersive Media and Immersive Content:
+    - at start-up it restores the saved spatial anchor, else the pose saved with the room;
+    - when the user lets go it saves the pose at once, then 0.5 s later anchors it there, saves the anchor and erases the old one;
+    - first placements are anchored too;
+    - content follows its anchor through tracking corrections and headset off/on, and hides while the anchor is lost.
+  - Anchor saves, loads and erases run one at a time, and a failed save is retried once.
+  - `PlacementIndex` (one JSON file per room, version 2): pose relative to the floor, size, anchor id and save time. Version-1 files still load. With no mapped room, placements are saved relative to the tracking space.
+  - "Forget room" erases the room's saved anchors.
+  - Automation's `media turn|move|height` save the placement as a release would.
+
 ### Fixed
+- SPZ v3/v4 files with more than about 60,000 splats crashed the app. The decoder allocated 16 bytes of stack per splat and overflowed the worker thread's stack, which Mono reports as SIGILL; that includes Quest. It was found with PlayCanvas's `biker.spz`.
+- Splat renderers released their GPU buffers while still drawing that frame; they now stop drawing first. Video does the same with its texture.
+- An OBJ with a material library but no `usemtl` drew untextured; it uses the library's material again.
+- Automation's `media open` takes a quoted source with spaces.
 - The automation bridge could read `command.txt` between its creation and its first write, and drop the command. It now waits for content; writers should write `command.tmp` and rename it.
 - Shapes created at runtime (anchor marker, panel grab bar, walkable-area outline) rendered pink on device. They now use a bundled URP Unlit material (`ImmersiveXRuntime.mat`), referenced from the settings asset so it's always in the build.
 - The walkable-area outline was drawn in the wrong place on Quest. On see-through and room-aware platforms the session now zeroes the rig's camera height offset, so the camera and the room's planes share one space. The outline follows the XR Origin's trackables.
 - XR Simulation showed a flat yellow background. The baseline now adds AR Foundation's **AR Background** URP renderer feature.
 - Play mode waited 10 s for head tracking in XR Simulation. Tracking is now also confirmed by `ARSession.state`.
+- In the editor, Play mode waited for the Game view to have focus before placing content, which stalled automation runs. Only devices wait for focus now.
 - Quest passthrough didn't draw. The configurator now enables the Meta Quest OpenXR feature set, including its required Composition Layers Support, and `Validate()` reports if it's off.
 - Quest wasn't detected on device. `MetaQuestAdapter` now recognises the running Meta session and logs why when it doesn't.
 - Room scanning no longer starts on platforms without room data.

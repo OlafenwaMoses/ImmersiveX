@@ -16,7 +16,14 @@ namespace ImmersiveX.Media
         /// Pack <paramref name="cloud"/> (already y-down). Positions are quantised to 16 bits inside the bounds, log scales
         /// to 8 bits inside <paramref name="scaleRange"/>, rotation and colour to 8 bits.
         /// </summary>
-        public static uint[] Pack(SplatCloud cloud, out HologramFrameHeader header, out Vector2 scaleRange)
+        public static uint[] Pack(SplatCloud cloud, out HologramFrameHeader header, out Vector2 scaleRange) =>
+            Pack(cloud, null, out header, out scaleRange);
+
+        /// <summary>
+        /// Pack with a given log-scale range: every frame of a stream shares the one in its <c>stream.json</c>. Null works
+        /// the range out from this cloud.
+        /// </summary>
+        public static uint[] Pack(SplatCloud cloud, Vector2? fixedScaleRange, out HologramFrameHeader header, out Vector2 scaleRange)
         {
             var count = cloud.Count;
             var rows = Math.Max(1, (count + TextureWidth - 1) / TextureWidth);
@@ -47,6 +54,12 @@ namespace ImmersiveX.Media
 
             lo = Mathf.Max(lo, -16f);
             hi = Mathf.Clamp(hi, lo + 1e-3f, 8f);
+            if (fixedScaleRange.HasValue)
+            {
+                lo = fixedScaleRange.Value.x;
+                hi = Mathf.Max(fixedScaleRange.Value.y, lo + 1e-3f);
+            }
+
             scaleRange = new Vector2(lo, hi);
             header = new HologramFrameHeader { Count = count, Min = min, Max = max, Rows = rows };
 
@@ -90,15 +103,21 @@ namespace ImmersiveX.Media
             return data;
         }
 
-        /// <summary>Decode, select and pack on a worker thread.</summary>
-        public static Task<PackedSplats> PackAsync(Func<SplatCloud> decode, UpAxis up, int maxCount) => Task.Run(() =>
+        /// <summary>
+        /// Decode, select and pack on a worker thread. <paramref name="dropFarBackground"/> leaves out a capture's distant
+        /// background (see <see cref="SplatCloud.WithoutFarBackground"/>).
+        /// </summary>
+        public static Task<PackedSplats> PackAsync(Func<SplatCloud> decode, UpAxis up, int maxCount, bool dropFarBackground = false) => Task.Run(() =>
         {
             var cloud = decode();
             var total = cloud.Count;
             cloud.ToYDown(up);
+            var background = 0;
+            if (dropFarBackground)
+                cloud = cloud.WithoutFarBackground(out background);
             cloud = cloud.Strongest(maxCount);
             var data = Pack(cloud, out var header, out var range);
-            return new PackedSplats(data, header, range, cloud.Positions, total);
+            return new PackedSplats(data, header, range, cloud.Positions, total) { Background = background };
         });
 
         static uint Quantize16(float value, float min, float extent) =>
@@ -126,6 +145,9 @@ namespace ImmersiveX.Media
 
         /// <summary>How many splats the file had before the most visible were kept.</summary>
         public readonly int SourceCount;
+
+        /// <summary>How many far-background splats were left out.</summary>
+        public int Background { get; set; }
 
         public PackedSplats(uint[] data, HologramFrameHeader header, Vector2 scaleRange, float[] positions, int sourceCount)
         {

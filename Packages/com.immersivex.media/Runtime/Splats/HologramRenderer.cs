@@ -107,6 +107,12 @@ namespace ImmersiveX.Media
 
         public void Dispose()
         {
+            // Stop drawing before the buffers go. Destroy only takes effect at the end of the frame, and a renderer that
+            // draws released buffers crashes the graphics driver (seen on Metal when switching from a large splat scene).
+            if (_renderer != null)
+                _renderer.enabled = false;
+            if (Transform != null)
+                Transform.gameObject.SetActive(false);
             _frame.Release();
             _order.Release();
             UnityEngine.Object.Destroy(_mesh);

@@ -17,6 +17,7 @@ namespace ImmersiveX.Media
                 case MediaKind.Mesh: return new MeshPlayable(MediaSequence.Single(detection.Url), detection.Bytes);
                 case MediaKind.Sequence: return new SequencePlayable(detection);
                 case MediaKind.Video: return new VideoPlayable(detection.Requested);
+                case MediaKind.Image: return new ImagePlayable(detection.Requested);
                 case MediaKind.Codec: return detection.Codec.Create(detection);
                 default: return new UnavailablePlayable($"{detection.Kind} playback is coming in the next step.");
             }

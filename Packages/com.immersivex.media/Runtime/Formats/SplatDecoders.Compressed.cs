@@ -176,6 +176,7 @@ namespace ImmersiveX.Media
             const float ColourScale = 0.15f;
             var cloud = new SplatCloud(count) { Up = UpAxis.PositiveY }; // right, up, back
             var unit = 1f / (1 << fractionalBits);
+            Span<float> q = stackalloc float[4]; // once: a stackalloc inside the loop would grow the stack by 16 bytes a splat
             for (var i = 0; i < count; i++)
             {
                 for (var k = 0; k < 3; k++)
@@ -205,7 +206,7 @@ namespace ImmersiveX.Media
                     // Smallest three in x, y, z, w order: 2-bit index of the largest, then three sign + 9-bit magnitudes.
                     var r = BitConverter.ToUInt32(rotations, i * 4);
                     var largest = (int)(r >> 30);
-                    Span<float> q = stackalloc float[4];
+                    q.Clear();
                     var sum = 0f;
                     for (int k = 0, slot = 0; k < 4; k++)
                     {

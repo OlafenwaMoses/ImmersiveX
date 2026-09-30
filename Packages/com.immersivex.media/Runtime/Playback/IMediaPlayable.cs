@@ -13,7 +13,7 @@ namespace ImmersiveX.Media
         /// <summary>An upright screen (flat video).</summary>
         Screen,
 
-        /// <summary>All around the viewer (360° and 180° video).</summary>
+        /// <summary>All around the viewer (360° and 180° video and photos).</summary>
         Surround,
     }
 
@@ -50,6 +50,12 @@ namespace ImmersiveX.Media
         public bool Loop;
         public string Quality = "base";
         public UpAxis Up = UpAxis.Auto;
+
+        /// <summary>360°/180° video and photos: how the frame is split between the eyes.</summary>
+        public StereoLayout Stereo = StereoLayout.Auto;
+
+        /// <summary>Frames per second for a folder of frames or a sequence; 0 keeps the file's own rate (30 for a folder).</summary>
+        public float FrameRate;
 
         /// <summary>Most Gaussians or points drawn at once; larger files keep the most visible ones.</summary>
         public int MaxGaussians = 400_000;
