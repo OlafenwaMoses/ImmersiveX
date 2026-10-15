@@ -9,6 +9,7 @@ ImmersiveX Media bundles these libraries, unchanged, in `Runtime/Plugins/`:
 
 It depends on these Unity packages, which are installed from the Unity registry rather than bundled:
 - glTFast (`com.unity.cloud.gltfast` 6.20.0), for glTF/GLB models.
+- Draco for Unity (`com.unity.cloud.draco` 5.4.3), KTX for Unity (`com.unity.cloud.ktx` 3.7.0) and meshopt decompression (`com.unity.meshopt.decompress` 0.2.0-exp.1), for compressed glTF.
 - Burst, Collections and Mathematics, which glTFast pulls in.
 
 The format specifications implemented here come from the formats' reference implementations: 3D Gaussian Splatting, PlayCanvas, antimatter15/splat, Niantic SPZ and GaussianSplats3D. No code was copied from them.

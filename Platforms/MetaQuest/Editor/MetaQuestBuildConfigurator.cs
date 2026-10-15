@@ -72,6 +72,8 @@ namespace ImmersiveX.Platforms.MetaQuest.Editor
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel32;
             PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel34;
             PlayerSettings.Android.forceInternetPermission = true; // streamed content (holograms, media)
+            PlayerSettings.Android.preferredInstallLocation = AndroidPreferredInstallLocation.Auto; // Meta Horizon Store: installLocation "auto"
+            PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft; // Meta Horizon Store: screenOrientation "landscape"
             EditorUserBuildSettings.androidBuildSubtarget = MobileTextureSubtarget.ASTC;
             EditorUserBuildSettings.buildAppBundle = false;
 

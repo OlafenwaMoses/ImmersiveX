@@ -1,10 +1,14 @@
 # Your content goes here
 
-This is the only folder you need to touch to build an experience with ImmersiveX.
+This is the folder for your own Unity objects (models, prefabs, textures, audio and video) in an ImmersiveX experience.
 
-1. Put your models, prefabs, textures, audio and video in this folder (sub-folders are fine).
+1. Put them in this folder (sub-folders are fine).
 2. Drag them into the `Main` scene.
 3. Right-click the object → **ImmersiveX ▸ Make Immersive**.
 
-Everything else — see-through view, room mapping, saved placement, hand and controller grabbing — is handled for you.
-See `docs/adding-content.md` for the details.
+For media files, folders and URLs (splats, 4D captures, glTF, meshes, video, photos, web pages, 4D meshes), use
+**ImmersiveX ▸ Media ▸ Add Media…** instead: it copies them into `Assets/StreamingAssets/ImmersiveXContent/` and adds
+them to the scene. See [`CONTENT_GUIDE.md`](../../CONTENT_GUIDE.md) for the structure each kind needs.
+
+Everything else (see-through view, room mapping, saved placement, hand and controller grabbing, the content menu) is
+handled for you.

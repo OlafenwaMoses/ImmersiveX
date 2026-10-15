@@ -85,10 +85,11 @@ Everything marked ❌ is checked on the headset.
 - Saved rooms live in `Android/data/genxr.immersivex.app/files/ImmersiveX/spaces/`.
 
 ## Media (holograms, splats, models, video)
-- **Build order:** the **3.5D Xperience** demo scene is first in the build, then `Main.unity`.
+- **Build order:** the demo scene (**ImmersiveX ▸ Demos**) is first in the build, then `Main.unity`.
 - **Any content:** add Immersive Media objects to a scene, each with its own controls and handles. See the [Immersive Media guide](../media.md).
-- **Bandwidth:** the 3.5D Xperience's base quality needs about **24 MB/s**, so use fast Wi-Fi (Wi-Fi 6 near the router). If it keeps showing *Buffering*, the link is too slow. The status line, logged every 10 s, shows the download rate.
-- **Sound:** plays through Android's MediaPlayer. The build requires the INTERNET permission, which the configurator sets.
+- **Bandwidth:** a streamed hologram's base quality needs about **24 MB/s**, so use fast Wi-Fi (Wi-Fi 6 near the router). If it keeps showing *Buffering*, the link is too slow. The status line, logged every 10 s, shows the download rate.
+- **Sound:** plays through Android's MediaPlayer, including soundtracks bundled inside the APK. The build requires the INTERNET permission, which the configurator sets.
+- **Content menu:** swipe either hand towards the middle of your body to open it, the reverse to close it (see the [README](../../README.md#in-the-headset)).
 - **Splat budget:** big splat scenes keep their 400,000 most visible splats on the headset. Set **Max Gaussians** to change that.
 
 ## Device checklist
@@ -103,13 +104,34 @@ Everything marked ❌ is checked on the headset.
 | Anchor after headset off/on (S2) | Take the headset off for 10 s, put it back on | The marker hasn't moved |
 | Anchor after restart (S2) | Quit the app fully, relaunch | The marker reloads in the same real-world spot |
 | Frame rate | Panel | 72 fps or better |
-| Hologram (3.5D) | Launch, press **Play** | At the room's centre, 1.6 m tall, with sound; no *Buffering* after the first second |
+| Streamed hologram | Launch, press **Play** | At the room's centre, 1.6 m tall, with sound; no *Buffering* after the first second |
 | Several pieces of media | A scene with more than one Immersive Media | Each stands in its own spot around the centre, facing you, with its own controls |
 | Handles | Drag the move bar, a turn bar, the resize corner | It slides across the floor, turns only about the up axis, and resizes; the panel follows moves but not turns |
 | Stays put | Move, turn and resize something; take the headset off for 10 s and put it back on; quit fully and relaunch | It never moves by itself; after the relaunch it's back where you left it, and the log says `placed at its spatial anchor` |
-| Zebra (4D) | Press **Play** on the zebra with Wi-Fi off | It plays from inside the app: 1.35 m tall, 30 fps, no *Buffering* |
+| Bundled 4D content | Press **Play** on a packed 4D capture or 4D mesh with Wi-Fi off | It plays from inside the app with its sound, no *Buffering* |
+| Content menu | Swipe a hand towards your middle, pick another piece, swipe back | The menu opens in front of you, shows one piece at a time, and closes |
 
 Record results in `docs/validation/`.
+
+## Publishing to the Meta Horizon Store
+Every Quest build already follows Meta's [release manifest rules](https://developers.meta.com/horizon/resources/publish-mobile-manifest/) (`MetaQuestBuildConfigurator` and `MetaQuestStoreManifest`):
+- minSdk 32, targetSdk 34 (required for apps created since March 2026), install location `auto`;
+- the launch activity is landscape and excluded from recents, with the `com.oculus.intent.category.VR` category;
+- `com.oculus.supportedDevices` uses Meta's identifiers (`quest2|questpro|quest3|quest3s`), and `com.meta.store.defaultDeviceTargets` is `quest2+`, so uploads don't target the original Quest and future devices are included;
+- the build isn't debuggable.
+
+Then:
+1. **Sign with your own release key,** v1 and v2 signatures, and verify (`apksigner` is in the bundled Android SDK's `build-tools`):
+   ```sh
+   apksigner sign --ks release.keystore --ks-key-alias <alias> --min-sdk-version 23 \
+     --v1-signing-enabled true --v2-signing-enabled true --out ImmersiveX-signed.apk Builds/metaquest/ImmersiveX.apk
+   apksigner verify --verbose --min-sdk-version 23 ImmersiveX-signed.apk
+   ```
+   Keep the key and its password safe and outside the repository: every update must be signed with the same key.
+2. **Raise Bundle Version Code** (Player ▸ Android) for every upload.
+3. **Upload** with Meta Quest Developer Hub (App Distribution ▸ your app ▸ a release channel). The organisation must have signed Meta's Developer Distribution Agreement first.
+
+A store-signed build can't be installed over one signed with Unity's debug key: uninstall first, which clears the app's saved rooms and placements.
 
 ## Troubleshooting
 | Symptom | Fix |

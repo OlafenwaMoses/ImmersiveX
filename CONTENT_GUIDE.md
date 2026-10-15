@@ -58,6 +58,9 @@ The same rules apply to every kind of content. **Only controllers have a pointer
 
 ### The content menu
 
+<p align="center"><img src="docs/images/content-menu-swipes.svg" alt="Content menu swipes: open with the right hand right to left or the left hand left to right; close with the reverse" width="720"></p>
+<p align="center"><img src="docs/images/content-menu.png" alt="The content menu: the scene's content with the one showing highlighted, plus Quest menu and Close app" width="320"></p>
+
 - **Open it** with a fast sideways swipe in front of you: the right hand from right to left, or the left hand from left to right. It opens in front of your eyes, wherever you are; if it's open somewhere else, the swipe brings it to you.
 - **Close it with the reverse swipe:** the right hand from left to right, or the left hand from right to left.
   - Your hand's way back right after an opening swipe doesn't close it (nothing counts for 0.8 s after a swipe).

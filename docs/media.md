@@ -34,6 +34,8 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
 | Sequence | A folder of numbered frames, or a sequence `.json`, of splats, points or meshes | Standing, played at its frame rate, with optional sound |
 | Video | `.mp4`, `.m4v`, `.mov` (H.264, or H.265 tagged `hvc1`), `.webm` (VP8) | Flat: an upright screen. 360° and 180°, mono or stereo: a sphere around the user |
 | Photo | `.jpg`, `.jpeg`, `.png` | Flat: an upright screen (a PNG's transparency is kept). 360° and 180°, mono or stereo: a sphere around the user |
+| Web experience | A three.js page: `.html`, a folder with `index.html`, or an `https` URL | The page runs out of sight as its own player; its 3D scene is drawn natively in the room, its controls on a panel beside it (see [Web experiences](#web-experiences)) |
+| 4D mesh | A folder with a `.sp4m` container and its soundtrack | Standing, animated on its soundtrack's clock, with captions and cards that point at its parts (see [4D meshes](#4d-meshes)) |
 
 **Detection:**
 - **By extension**, mostly. A `.ply` file's header decides between splats, points and a mesh.
@@ -89,11 +91,14 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
   - For stills (splats, meshes, photos, unanimated models), Play and the seek bar are greyed out and the panel shows what the file is.
   - The panel follows the media when it moves but not when it turns.
   - 360° and 180° media put the panel in front of the user.
-- **Handles** (grab with a controller or hand, by ray or pinch):
+- **Handles** (a controller's ray, or a hand at them):
   - **Move bar**, under the controls: drag to slide the media across the floor. It stays inside the room.
-  - **Turn bars**, at its left and right: drag around it like a turntable. It only turns about the up axis.
+  - **Turn bars**, at its left and right, and a **turn ring** around its base: drag around it like a turntable. It only turns about the up axis.
   - **Resize corner**, top right: drag up to make it bigger, down to make it smaller.
-- **Grab the media itself:** one hand slides it and a wrist twist turns it; two hands turn it like a wheel.
+- **Grab the media itself** with a hand or controller at it: one hand slides it and a wrist twist turns it; two hands turn it like a wheel. A controller's ray only clicks and drags handles; it never picks content up.
+- **Hands have no pointer:** tracked hands press buttons with a finger and pinch or grab what's within reach. Controllers in hand keep their rays (Settings ▸ Hand Pointers gives hands rays too).
+- **Parts:** models with two or more meshes, web scenes and 4D meshes have selectable parts. A ray click selects a part (click again for the whole), a hand picks it up, and its label's **Put back** returns it. Parts move only while the media is paused. Turn it off with **Selectable Parts**.
+- **Content menu:** lists every piece of content in the scene and shows one at a time (the choice is remembered), with **Quest menu** and **Close app**. A quick sideways swipe of either hand opens it: towards the middle of the body (right hand right to left, left hand left to right); the reverse closes it. See the [README](../README.md#in-the-headset) for the picture. Turn it off in Settings ▸ Content Menu.
 
 It waits, paused, for Play unless **Play On Start** is set. With **Loop** off, it stops at the end and Play starts it again.
 
@@ -122,14 +127,19 @@ A 4D Gaussian-splat capture (4DGS) is a folder of splat frames, usually standard
 
 - **What it writes:** `stream.json` and one frame file per frame, at 17 bytes a Gaussian (a sixth of a 3DGS `.ply`). The frames upload to the GPU as they are, so playback costs almost no CPU.
 - **Frame formats:** 3DGS or compressed `.ply`, point `.ply`, `.splat`, `.spz` or `.ksplat`, one kind per folder, in natural order.
-- **What it keeps:** the view-independent colour (the SH DC term). The higher spherical-harmonic bands are dropped; on the zebra they change the colour by about 4 %.
-- **One fit for the clip:** the character's usual height, feet and centre over the whole clip, written as `fit` in `stream.json`. Add Media sets the media's Height to that height, so a capture in metres keeps its real size.
+- **What it keeps:** the view-independent colour (the SH DC term). The higher spherical-harmonic bands are dropped; on a typical capture they change the colour by about 4 %.
+- **One fit for the clip,** written as `fit` in `stream.json`, so nothing changes size while it plays:
+  - **Height:** the clip's usual height (the median over its frames), so a character doesn't shrink when it raises an arm.
+  - **Floor:** the ground the clip comes down to (the 90th percentile of the frames' lowest points), so a scene whose parts rise for most of the clip still stands on its ground.
+  - **Centre:** the medians of the frames' centres, so frames where something flies far away don't move it.
+  - Add Media sets the media's Height to the clip's real size, so a capture in metres keeps it.
+- **What flies far out of the room is left out:** splats more than 10 times the clip's height from its centre. Left in, they'd spread each frame's 16-bit positions so thin that everything else shimmers.
 - **Options:**
   - **Frame rate:** captures don't always say; 30 is common.
   - **Max Gaussians a frame:** keeps the most visible ones, for fewer bytes and faster frames.
   - **Up axis.**
   - **Soundtrack:** a sound file in the folder becomes the soundtrack.
-- **Size:** the zebra is 164 frames × 100,000 Gaussians = 267 MB in the APK, read at 51 MB/s while it plays. Packing it takes about 10 s.
+- **Size:** 164 frames × 100,000 Gaussians is 267 MB in the APK, read at 51 MB/s while it plays, and packs in about 10 s.
 - **Not committed:** `Assets/StreamingAssets/ImmersiveXContent/` is git-ignored because of its size. Pack the capture again after a fresh clone; the build stops until you do.
 
 ## Streaming and sound
@@ -137,7 +147,7 @@ A 4D Gaussian-splat capture (4DGS) is a folder of splat frames, usually standard
   - They buffer 3 s ahead with 24 parallel downloads, because one connection is limited by latency.
   - The base tier needs about 24 MB/s.
   - The soundtrack is the clock.
-- **Sound on the Quest** plays through Android's MediaPlayer, which handles AAC/M4A, MP3, OGG and WAV.
+- **Sound on the Quest** plays through Android's MediaPlayer, which handles AAC/M4A, MP3, OGG and WAV. Soundtracks bundled in the app open straight from inside the APK (MediaPlayer can't open `jar:` URLs, so they go through a file descriptor).
 - **Sound in the editor:** Unity can't decode audio-only AAC, so a hologram's `.m4a` plays silently there. Video soundtracks always play.
 
 ## Vendor formats
@@ -151,7 +161,22 @@ A 4D Gaussian-splat capture (4DGS) is a folder of splat frames, usually standard
 - **Tests:** the format EditMode tests decode each sample and check that orientation. Without the samples, those tests are skipped.
 - **Trying one:** in Play mode, send `media open ImmersiveXSamples/<file>` to play it, or set it as an Immersive Media's Source.
 
-**ImmersiveX ▸ Demos ▸ 3.5D Xperience** builds the demo scene, the first scene in the build: GenXR's streamed hologram, at the centre of the room. Add bundled content to it with Add Media; that content stays local (it's git-ignored), so keep those scene changes out of commits.
+**ImmersiveX ▸ Demos** builds the demo scene, the first scene in the build: a streamed hologram at the centre of the room. Add bundled content to it with Add Media; that content stays local (it's git-ignored), so keep those scene changes out of commits.
+
+## Web experiences
+A three.js page (WebGLRenderer, r170 or later) as one self-contained `.html`, a folder with `index.html`, or an `https` URL.
+- **The page runs out of sight** in a web view (headless Chrome in the editor, Android's WebView on Quest), as it is: its own timeline, sound and captions stay in charge.
+- **Its 3D scene is drawn natively in the room:** geometry, materials, textures and every object's movement are streamed from the page and rebuilt with glTF-style PBR materials, instanced, skinned and line meshes. Its actors (or its top-level things) become selectable parts.
+- **Its own controls** (buttons, captions, cards) show on a panel to the user's left, within reach. Immersive Media's controls don't show.
+- **Where it stands,** set once when the page has loaded and stands still: the page's ground is the room's floor (kept even when the page hides it; without one, the level most of the scene rests on), and what the page's camera looks at stands at the content's place, as tall as **Height**. Then it plays as written; what sinks below the floor is hidden.
+- **Hidden** (the content menu shows something else), the page waits where it is, with its sound paused, and carries on when it's shown again.
+- **Not reproduced:** custom shaders (drawn in their main colour), post-processing, points and sprites. Pages on other engines or on three.js's WebGPU renderer show on the panel only.
+
+## 4D meshes
+A `.sp4m` container is a scene baked over time: its triangles part by part, every part's pose 30 times a second, its colours twice a second, the rules it applies per pixel (a cutaway, a door, a dissolving set, highlights) and its soft effects as Gaussians.
+- **Bring a folder** with the container and its soundtrack. The container is gzipped inside but never named `.gz`: Android's APK packer unzips `.gz` files and drops the extension. Add Media renames `name.sp4m.gz` to `name.sp4m`, and the build check refuses a `.gz` name.
+- **How it plays:** standing on the floor, as tall as **Height**, on its soundtrack's clock with the standard controls. Its colours are baked, so nothing is relit. Captions show above the controls, and cards point at the parts the content names. Its parts are selectable.
+- **Budget:** a two-minute scene of about 160 objects and 400,000 triangles is a container of about 50 MB that loads in under a second on a Quest 3.
 
 ## Automation
 With the editor open (see [CONTRIBUTING](../CONTRIBUTING.md#driving-the-open-editor-automation)):
@@ -163,5 +188,8 @@ media [@<n>|@<name>] open <source> [format]  # switch what it plays (format: Aut
 media add [fps] <file, folder or URL>        # Add Media, then save the scene (Edit mode)
 media pack [fps] [title=Name] <folder>       # pack splat frames into StreamingAssets, scene untouched (Edit mode)
 media check                                  # the build's content check (Edit mode)
-demo                                         # build the 3.5D Xperience demo scene
+media scene | remove <name> | first <name>   # list, remove or reorder the scene's Immersive Media (Edit mode)
+media [@<n>] parts | inspect | node <name> | click <x> <y> | js <code>   # parts and web pages (Play mode)
+contentmenu status|open|close|select <n>|move <x> <y> <z>|swipe <right|left|both> [back]
+demo                                         # build the demo scene
 ```

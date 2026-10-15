@@ -79,7 +79,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - **Sound:** Android MediaPlayer on Meta Quest (`IStreamAudioProvider`). It's the clock for streams and sequences.
   - **Vendor formats:** `IMediaCodec` is a plug-in point for them (4DViews, Arcturus), which need their own SDKs.
   - **Samples:** `tools/samples/make_media_samples.py` generates a 5 MB test sample of every format (git-ignored, not committed), all showing one asymmetric test figure. EditMode tests decode each one and check its orientation; they're skipped when the samples haven't been made.
-  - **Demo scene:** **ImmersiveX ▸ Demos ▸ 3.5D Xperience** (GenXR's streamed hologram), the first scene in the build. Bundled content such as a 4D capture is added locally with Add Media; it isn't committed.
+  - **Demo scene:** **ImmersiveX ▸ Demos** builds a streamed-hologram demo scene, the first scene in the build. Bundled content such as a 4D capture is added locally with Add Media; it isn't committed.
   - **Bundled 4D content:**
     - A 4D Gaussian-splat capture (a folder of 3DGS `.ply` frames) is packed into a hologram stream that ships inside the app and plays offline, at 17 bytes a Gaussian (now by Add Media; see D4).
     - A stream's `stream.json` can carry one `fit` for the whole clip, so a character keeps its size when it raises an arm.
@@ -117,7 +117,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - "Forget room" erases the room's saved anchors.
   - Automation's `media turn|move|height` save the placement as a release would.
 
+- **Interaction rules (D5).**
+  - **The ray only clicks** (`DirectGrabOnly`, `ContentLayer`, `ContentClickRaycaster`): a hand or controller at the content picks it up; rays, gaze, teleport and climb never grab. Content bodies sit on Ignore Raycast, so the ray never blocks a panel, and rays click 3D parts.
+  - **Handles are controls** (`ContentHandles`, shared by Immersive Media and Immersive Content): move bar, turn bars, a new **turn ring** around the base, and a resize corner, by ray or hand. Make Immersive objects get them too, and their size is saved with their anchor.
+  - **Panels win near them** (`PanelZones`): with a hand at a panel, nearby grabbables and handles let its buttons take the press.
+  - **Hands have no pointer** (`HandPointers`): tracked hands press and grab within reach; controllers keep their rays. Settings ▸ Hand Pointers gives hands rays.
+- **Selectable parts** (`ContentParts`, `PartLabel`): models with several meshes, Unity objects (opt-in), web scenes and 4D meshes. A click selects a part (again for the whole), a hand picks it up, **Put back** / **Put all back** return it. Parts move only while the content is paused; solid colliders, and none for a scene's ground. A far part's label comes within reach of the user.
+- **Content menu** (`ContentMenu`, `HandSwipes`, `SwipeDetector`, `SwipeGate`): lists the scene's content and shows one piece at a time (remembered), with **Quest menu** and **Close app**. A quick sideways swipe towards the body's middle opens it in front of the user (right hand right→left, left hand left→right); the reverse closes it. Claps and the hand's way back don't count (0.8 s cooldown). Settings ▸ Content Menu.
+- **Web experiences in 3D (D6).** A three.js page (`.html`, a folder with `index.html`, or a URL) plays as Immersive Media:
+  - it runs out of sight in a web view: headless Chrome in the editor, Android WebView on Quest (`OffscreenWebView`), with app content served locally;
+  - a JS bridge (`WebBridge.js`) streams its scene, which `WebScene` rebuilds natively (PBR, instanced, skinned and line meshes); actors become parts;
+  - the page's own controls, captions and cards show on a panel beside it;
+  - one placement rule for every page, applied once when it has loaded: its ground is the floor, what its camera looks at stands at the content's place; what sinks below the floor is hidden;
+  - hidden by the menu, the page holds its clocks, frames and sound and resumes when shown.
+- **4D splat packing rules (D8):** one fit per clip from medians (centre and height) and the ground the clip comes down to (90th percentile of its lowest points); splats more than 10× the clip's height away are left out (`SplatCloud.Within`).
+- **4D meshes (`.sp4m`, D9):** `Mesh4DContainer`, `Mesh4DRenderer`, `Mesh4DPlayable`, `Mesh4DParts`. Atlas meshes and engine families from one object table, colour keys painted on the GPU, cutaway, door and dissolve rules in the shader, baked effect Gaussians through the hologram renderer, captions and callout cards through `IMediaAnnotations` and `MediaCallouts`. Add Media renames a `.sp4m.gz` to `.sp4m` and the build check refuses `.gz` names (Android's packer unzips them).
+- **Meta Horizon Store packaging:** `MetaQuestStoreManifest` and the configurator make every Quest build follow Meta's release manifest rules (install location auto, landscape, excluded from recents, Meta's device identifiers, default device targets `quest2+`). Release signing steps in the Quest guide.
+- **Docs:** `CONTENT_GUIDE.md` (every content type and the structure it needs); README, media and Quest guides brought up to date.
+- Automation: `media scene|remove|first`, `media … parts|inspect|node|click|js`, `contentmenu status|open|close|select|move|swipe`, `parts …`, `invoke pointers|reach|uirays`.
+
 ### Fixed
+- Soundtracks bundled in the APK were silent on Quest: MediaPlayer can't open `jar:` URLs, so they now open through `AssetManager.openFd`.
+- Play buttons on Quest ignored fingers and pinches when a long grab box or the move bar was right under the panel; panel glass also blocked rays.
+- Web pages re-measured while racing through their load and froze on the first press; they're now placed once, after loading. A page's huge ground no longer gets a collider that picked up the whole base.
+- The old 4D clip fit used a mean centre and a median floor, which put large scenes far away or sank them; see the packing rules above.
 - SPZ v3/v4 files with more than about 60,000 splats crashed the app. The decoder allocated 16 bytes of stack per splat and overflowed the worker thread's stack, which Mono reports as SIGILL; that includes Quest. It was found with PlayCanvas's `biker.spz`.
 - Splat renderers released their GPU buffers while still drawing that frame; they now stop drawing first. Video does the same with its texture.
 - An OBJ with a material library but no `usemtl` drew untextured; it uses the library's material again.

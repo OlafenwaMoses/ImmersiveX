@@ -109,8 +109,10 @@ Commands:
 - `open <scene>` · `playmode xr-simulation|metaquest-simulator`
 - `play <seconds>` (`0` keeps playing until `stop`) · `stop` · `capture`
 - `invoke <panel action>`
-- `media list` · `media [@<n>|@<name>] status|play|pause|toggle|seek <s>|mute|unmute|speaker|volume <0-1>|turn <deg>|move <x> <z>|height <m>|open <source> [format]` (ImmersiveX Media)
+- `media list` · `media [@<n>|@<name>] status|play|pause|toggle|seek <s>|mute|unmute|speaker|volume <0-1>|turn <deg>|move <x> <z>|height <m>|open <source> [format]` (ImmersiveX Media; the full list is in [docs/media.md](docs/media.md#automation))
+- `media add [fps] [title=Name] <file, folder or URL>` · `media pack …` · `media check` · `media scene` (Edit mode)
+- `contentmenu status|open|close|select <n>|move <x> <y> <z>|swipe <right|left|both> [back]` · `parts …` (selectable parts)
 - `configure <platform>` · `build <platform>` · `buildrun <platform>`
-- `scene` · `demo` (3.5D Xperience scene) · `baseline` · `menu <path>`
+- `scene` · `demo` (the demo scene) · `baseline` · `menu <path>`
 
 Every command runs the same code as the menus, so you can watch it happen.
