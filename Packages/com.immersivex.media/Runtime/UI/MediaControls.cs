@@ -35,6 +35,8 @@ namespace ImmersiveX.Media
         Slider _seek;
         Slider _volume;
         Text _time;
+        Text _caption;
+        Image _captionGlass;
         bool _seeking;
         float _nextRefresh;
 
@@ -74,6 +76,33 @@ namespace ImmersiveX.Media
                 Refresh();
             }
         }
+
+        /// <summary>
+        /// Show <paramref name="caption"/> above the controls (narrated media), or nothing when it's null or empty.
+        /// </summary>
+        public void SetCaption(string caption)
+        {
+            var show = !string.IsNullOrEmpty(caption);
+            if (_caption == null)
+            {
+                if (!show)
+                    return;
+                var root = (RectTransform)transform.Find("Canvas");
+                _captionGlass = WorldUi.Rect(root, "Caption Glass", new Vector2(0f, Height * 0.5f + 52f), new Vector2(Width, 84f), new Color(0.03f, 0.045f, 0.07f, 0.78f));
+                _captionGlass.sprite = UiSprites.Panel;
+                _captionGlass.type = Image.Type.Sliced;
+                _caption = WorldUi.Label(root, "Caption", string.Empty, 22, new Vector2(0f, Height * 0.5f + 52f), new Vector2(Width - 36f, 76f),
+                    FontStyle.Normal, TextAnchor.MiddleCenter);
+            }
+
+            _captionGlass.gameObject.SetActive(show);
+            _caption.gameObject.SetActive(show);
+            if (show && _caption.text != caption)
+                _caption.text = caption;
+        }
+
+        /// <summary>The caption showing now, or null.</summary>
+        public string Caption => _caption != null && _caption.gameObject.activeSelf ? _caption.text : null;
 
         // ---------------------------------------------------------------- actions (also used by automation)
 
@@ -173,7 +202,7 @@ namespace ImmersiveX.Media
             glass.sprite = UiSprites.Panel;
             glass.type = Image.Type.Sliced;
             glass.color = Glass;
-            glass.raycastTarget = true; // a ray on the panel stops here instead of grabbing what's behind it
+            glass.raycastTarget = false; // only the controls catch the ray, so a panel's glass never hides another panel's buttons
             var rim = WorldUi.Rect(root, "Rim", Vector2.zero, new Vector2(Width, Height), Rim);
             rim.sprite = UiSprites.PanelRim;
             rim.type = Image.Type.Sliced;

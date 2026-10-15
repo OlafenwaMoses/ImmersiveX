@@ -7,9 +7,10 @@ namespace ImmersiveX.Media
 {
     /// <summary>
     /// A glTF/GLB model (glTFast), fitted to the media's height, standing on the floor and facing the user. Its first
-    /// animation is the timeline: Play, Pause and the seek bar drive it. A model without animation is a still.
+    /// animation is the timeline: Play, Pause and the seek bar drive it. A model without animation is a still. A model with
+    /// two or more meshes has selectable parts (see <see cref="ContentParts"/>): its nodes, and the nodes grouping them.
     /// </summary>
-    sealed class ModelPlayable : IMediaPlayable
+    sealed class ModelPlayable : IMediaPlayable, IMediaParts
     {
         MediaContext _context;
         GltfImport _gltf;
@@ -20,11 +21,15 @@ namespace ImmersiveX.Media
         int _meshes;
         int _clips;
         bool _wantPlaying;
+        ContentParts _parts;
 
         public string Description => _model == null
             ? "Model"
             : $"Model · {_meshes} mesh{(_meshes == 1 ? string.Empty : "es")} · " +
-              (_clip != null ? $"{_clips} animation{(_clips == 1 ? string.Empty : "s")}, playing '{_clip.name}'" : "no animation");
+              (_clip != null ? $"{_clips} animation{(_clips == 1 ? string.Empty : "s")}, playing '{_clip.name}'" : "no animation") +
+              (_parts != null ? $" · {_parts.Parts.Count} parts" : string.Empty);
+
+        public ContentParts Parts => _parts;
 
         public MediaPresentation Presentation => MediaPresentation.Standing;
         public bool IsLoaded => _model != null;
@@ -100,6 +105,8 @@ namespace ImmersiveX.Media
 
             _meshes = _model.GetComponentsInChildren<Renderer>().Length;
             Fit();
+            if (context.SelectableParts)
+                _parts = ContentParts.FromHierarchy(_model.transform);
         }
 
         /// <summary>

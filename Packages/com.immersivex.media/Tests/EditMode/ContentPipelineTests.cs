@@ -76,6 +76,45 @@ namespace ImmersiveX.Media.Tests
         }
 
         [Test]
+        public void Packer_StandsAClipOnItsGroundWhenPartsRiseForMostOfIt()
+        {
+            var capture = Path.Combine(_folder, "scene");
+            Directory.CreateDirectory(capture);
+            for (var frame = 0; frame < 5; frame++)
+                File.WriteAllBytes(Path.Combine(capture, $"f{frame}.ply"), GaussianPly(200 + frame, armRaised: false, lift: frame < 2 ? 0f : 0.5f));
+
+            var result = SplatSequencePacker.Pack(SplatSequencePacker.Frames(capture), Path.Combine(_folder, "stream"), 6f, UpAxis.Auto, 0, "Scene");
+
+            Assert.AreEqual(0f, result.Fit.Bottom, 0.05f, "the ground the clip stands on, not where it floats most of the time");
+            Assert.AreEqual(2f, result.Fit.Height, 0.1f);
+            Assert.AreEqual(0, result.LeftOut);
+        }
+
+        [Test]
+        public void Packer_LeavesOutWhatFliesFarOutOfTheRoom()
+        {
+            var capture = Path.Combine(_folder, "clip");
+            Directory.CreateDirectory(capture);
+            for (var frame = 0; frame < 3; frame++)
+                File.WriteAllBytes(Path.Combine(capture, $"f{frame}.ply"), GaussianPly(200, armRaised: false, flownAway: frame == 2 ? 20 : 0));
+
+            var result = SplatSequencePacker.Pack(SplatSequencePacker.Frames(capture), Path.Combine(_folder, "stream"), 6f, UpAxis.Auto, 0, "Clip");
+
+            Assert.AreEqual(0f, result.Fit.CentreX, 0.1f, "a frame with something far away doesn't move the clip");
+            Assert.AreEqual(1.5f, result.Fit.Height, 0.1f);
+            Assert.AreEqual(20, result.LeftOut);
+            Assert.AreEqual(1, result.FramesLeftOutOf);
+            var manifest = HologramManifest.Parse(File.ReadAllText(result.Manifest), new Uri(result.Manifest).AbsoluteUri);
+            var tier = manifest.FindTier("base");
+            var bytes = File.ReadAllBytes(new Uri(manifest.FrameUrl(tier, 2)).LocalPath);
+            var data = new uint[bytes.Length / 4];
+            Buffer.BlockCopy(bytes, 0, data, 0, bytes.Length);
+            var header = HologramFrame.ReadHeader(data);
+            Assert.AreEqual(180, header.Count);
+            Assert.Less(header.Max.x - header.Min.x, 1f, "positions span the figure, not the sky");
+        }
+
+        [Test]
         public void Packer_IgnoresFoldersOfMeshes()
         {
             File.WriteAllText(Path.Combine(_folder, "a.ply"), "ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nelement face 1\nproperty list uchar int vertex_indices\nend_header\n0 0 0\n1 0 0\n0 1 0\n3 0 1 2\n");
@@ -114,7 +153,8 @@ namespace ImmersiveX.Media.Tests
         }
 
         /// <summary>A standing figure of Gaussian splats, 1.5 tall in the usual y-down frame, one arm raised on request.</summary>
-        static byte[] GaussianPly(int count, bool armRaised)
+        /// <summary>A 1.5 m figure standing on y = 0 (y down), <paramref name="lift"/> above it, with <paramref name="flownAway"/> splats 5 km off.</summary>
+        static byte[] GaussianPly(int count, bool armRaised, float lift = 0f, int flownAway = 0)
         {
             var names = new[] { "x", "y", "z", "f_dc_0", "f_dc_1", "f_dc_2", "opacity", "scale_0", "scale_1", "scale_2", "rot_0", "rot_1", "rot_2", "rot_3" };
             var header = "ply\nformat binary_little_endian 1.0\nelement vertex " + count + "\n" +
@@ -126,8 +166,8 @@ namespace ImmersiveX.Media.Tests
                 var arm = armRaised && i % 10 == 0;
                 var values = new[]
                 {
-                    (float)random.NextDouble() * 0.4f - 0.2f,
-                    arm ? -1.9f : -(float)random.NextDouble() * 1.5f, // y down: the head is at -1.5, a raised hand above it
+                    i < flownAway ? 5000f : (float)random.NextDouble() * 0.4f - 0.2f,
+                    i < flownAway ? -3000f : (arm ? -1.9f : -(float)random.NextDouble() * 1.5f) - lift, // y down: the head is at -1.5, a raised hand above it
                     (float)random.NextDouble() * 0.2f - 0.1f,
                     0.5f, 0.2f, -0.3f, 2f, -4f, -4f, -4f, 1f, 0f, 0f, 0f,
                 };

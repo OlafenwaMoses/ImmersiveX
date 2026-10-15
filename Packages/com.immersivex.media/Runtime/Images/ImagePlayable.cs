@@ -63,6 +63,7 @@ namespace ImmersiveX.Media
             if (_coverage > 0f)
             {
                 _surface = Projection.BuildSphere(_texture, _coverage, _layout, out _mesh, out _material, out _bounds);
+                _surface.transform.SetParent(context.Root, true); // hidden with the media; it still follows the viewer's head
                 yield break;
             }
 

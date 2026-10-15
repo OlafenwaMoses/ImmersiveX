@@ -1,0 +1,585 @@
+// ImmersiveX web bridge: runs in a web page before the page's own scripts, finds the page's three.js scene through
+// three.js's devtools hook, and streams it to ImmersiveX, which draws it natively in the user's room:
+//   geometry, materials and textures once (again when they change), then every frame the local matrices,
+//   visibility, instance matrices and lights that changed, and where the page's camera is and looks. The page keeps running as it is: its own timeline,
+//   narration, captions and controls stay in charge. ImmersiveX shows the page's controls on a panel.
+// Messages go to window.ImmersiveXHost.post (Android WebView) or window.__ixPost (Chrome DevTools binding).
+// ImmersiveX talks back through window.__ixBridge.command({...}).
+(() => {
+  'use strict';
+  if (window.__ixBridge) return;
+
+  const MAX_TEXTURE = 1024;          // textures are sent at most this size (longest side)
+  const TEXTURE_RESEND_MS = 250;     // a texture that keeps changing (a canvas label) is sent at most 4 times a second
+  const MAX_VERTICES = 2000000;      // bigger geometry is skipped (and reported)
+  const EPSILON = 1e-6;
+
+  const post = (message) => {
+    const text = JSON.stringify(message);
+    try {
+      if (window.ImmersiveXHost && window.ImmersiveXHost.post) window.ImmersiveXHost.post(text);
+      else if (typeof window.__ixPost === 'function') window.__ixPost(text);
+    } catch (e) { /* the host went away */ }
+  };
+  const warn = (text) => post({ t: 'log', level: 'warn', text: String(text) });
+
+  // ---------------------------------------------------------------- ids
+
+  let nextId = 1;
+  const ids = new WeakMap();
+  const idOf = (thing) => { let id = ids.get(thing); if (!id) { id = nextId++; ids.set(thing, id); } return id; };
+
+  // ---------------------------------------------------------------- the page's three.js
+
+  const state = {
+    revision: null,
+    renderers: new Set(),
+    scenes: new Set(),
+    main: null,            // { scene, camera, renderer }
+    mirroring: false,      // skip the page's own drawing of the main scene (ImmersiveX draws it)
+    uiOnly: false,         // hide the page's 3D canvas: the panel shows only its HTML (controls, captions, cards)
+    started: false,
+    frame: 0,
+    lastSync: 0,
+  };
+
+  const hook = window.__THREE_DEVTOOLS__ || (window.__THREE_DEVTOOLS__ = new EventTarget());
+  hook.addEventListener('register', (e) => { state.revision = e.detail && e.detail.revision; });
+  hook.addEventListener('observe', (e) => {
+    const thing = e.detail;
+    if (!thing) return;
+    if (thing.isScene) state.scenes.add(thing);
+    else if (typeof thing.render === 'function' && thing.domElement) wrapRenderer(thing);
+  });
+
+  function wrapRenderer(renderer) {
+    if (state.renderers.has(renderer)) return;
+    state.renderers.add(renderer);
+    const render = renderer.render.bind(renderer);
+    renderer.render = function (scene, camera) {
+      // The page's 3D view: a Scene drawn with a perspective camera, straight to the screen or into a render target
+      // (pages with post-processing draw the scene offscreen, then a full-screen quad to the screen). The busiest wins.
+      const presenting = renderer.xr && renderer.xr.isPresenting;
+      if (!presenting && scene && scene.isScene && camera && camera.isPerspectiveCamera && meshCount(scene) > 0 &&
+          (!state.main || state.main.scene === scene || meshCount(scene) > meshCount(state.main.scene))) {
+        state.main = { scene, camera, renderer };
+        if (state.uiOnly) hideCanvas(renderer.domElement);
+        if (state.mirroring) {
+          // ImmersiveX draws this scene: keep the page's matrices up to date but skip its drawing, to the screen and into
+          // its post-processing's targets alike (on a headset, that GPU time belongs to the room).
+          if (scene.matrixWorldAutoUpdate !== false) scene.updateMatrixWorld();
+          if (camera.parent === null && camera.matrixWorldAutoUpdate !== false) camera.updateMatrixWorld();
+          sync();
+          return;
+        }
+        const result = render(scene, camera);
+        sync();
+        return result;
+      }
+      return render(scene, camera);
+    };
+  }
+
+  // How many meshes a scene draws, recounted at most once a second (scenes can hold thousands of objects).
+  const meshCounts = new WeakMap();
+  function meshCount(scene) {
+    const now = performance.now();
+    const cached = meshCounts.get(scene);
+    if (cached && now - cached.at < 1000) return cached.count;
+    let count = 0;
+    scene.traverseVisible((o) => { if (o.isMesh || o.isPoints || o.isLine) count++; });
+    meshCounts.set(scene, { count, at: now });
+    return count;
+  }
+
+  // ---------------------------------------------------------------- encoding
+
+  function base64(typed) {
+    const bytes = new Uint8Array(typed.buffer, typed.byteOffset, typed.byteLength);
+    let text = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(text);
+  }
+
+  function floats(attribute) {
+    const count = attribute.count, size = attribute.itemSize;
+    const out = new Float32Array(count * size);
+    if (!attribute.isInterleavedBufferAttribute && !attribute.normalized && attribute.array instanceof Float32Array) {
+      out.set(attribute.array.subarray(0, count * size));
+      return out;
+    }
+    const get = [attribute.getX, attribute.getY, attribute.getZ, attribute.getW];
+    for (let i = 0; i < count; i++)
+      for (let c = 0; c < size; c++)
+        out[i * size + c] = attribute.getComponent ? attribute.getComponent(i, c) : get[c].call(attribute, i);
+    return out;
+  }
+
+  function encodeAttribute(attribute) {
+    return { size: attribute.itemSize, count: attribute.count, f32: base64(floats(attribute)) };
+  }
+
+  const sentGeometry = new Map(); // id -> version key
+  function geometryKey(geometry) {
+    let key = '' + (geometry.index ? geometry.index.version : -1);
+    for (const name in geometry.attributes) key += ',' + name + ':' + geometry.attributes[name].version;
+    return key + '|' + geometry.groups.length;
+  }
+
+  function sendGeometry(geometry, out) {
+    const id = idOf(geometry);
+    const key = geometryKey(geometry);
+    if (sentGeometry.get(id) === key) return id;
+    sentGeometry.set(id, key);
+    const position = geometry.attributes.position;
+    if (!position) return id;
+    if (position.count > MAX_VERTICES) { warn(`Geometry with ${position.count} vertices skipped (too big).`); return id; }
+    const message = { t: 'geo', id, attrs: {} };
+    for (const name of ['position', 'normal', 'uv', 'color', 'skinIndex', 'skinWeight']) {
+      const attribute = geometry.attributes[name];
+      if (attribute) message.attrs[name] = encodeAttribute(attribute);
+    }
+    if (geometry.index) {
+      const array = geometry.index.array;
+      const wide = array instanceof Uint32Array || geometry.attributes.position.count > 65535;
+      const typed = wide ? Uint32Array.from(array.subarray(0, geometry.index.count)) : Uint16Array.from(array.subarray(0, geometry.index.count));
+      message.index = { wide, data: base64(typed) };
+    }
+    message.groups = geometry.groups.map((g) => [g.start, g.count, g.materialIndex || 0]);
+    message.range = [geometry.drawRange.start, geometry.drawRange.count === Infinity ? -1 : geometry.drawRange.count];
+    out.push(message);
+    return id;
+  }
+
+  const sentMaterial = new Map(); // id -> signature
+  const colorOf = (c) => (c && c.isColor ? [c.r, c.g, c.b] : null); // linear (three.js keeps colours linear)
+  function materialSignature(m) {
+    return [m.version, m.opacity, m.transparent, m.visible, m.side,
+      m.color && m.color.getHexString(), m.emissive && m.emissive.getHexString(), m.emissiveIntensity].join('|');
+  }
+
+  function sendMaterial(material, out) {
+    const id = idOf(material);
+    const signature = materialSignature(material);
+    if (sentMaterial.get(id) === signature) return id;
+    sentMaterial.set(id, signature);
+    const m = material;
+    const message = {
+      t: 'mat', id, type: m.type, name: m.name || '',
+      color: colorOf(m.color), opacity: m.opacity, transparent: !!m.transparent, alphaTest: m.alphaTest || 0,
+      side: m.side, depthWrite: m.depthWrite !== false, visible: m.visible !== false, vertexColors: !!m.vertexColors,
+      roughness: m.roughness, metalness: m.metalness, emissive: colorOf(m.emissive), emissiveIntensity: m.emissiveIntensity,
+      flatShading: !!m.flatShading, size: m.size, sizeAttenuation: m.sizeAttenuation, toneMapped: m.toneMapped !== false,
+      blending: m.blending, wireframe: !!m.wireframe,
+    };
+    for (const slot of ['map', 'normalMap', 'emissiveMap', 'alphaMap', 'roughnessMap', 'metalnessMap', 'aoMap'])
+      if (m[slot] && m[slot].isTexture) message[slot] = sendTexture(m[slot], out);
+    if (m.isShaderMaterial && m.uniforms) {
+      // Custom shaders can't be drawn natively: take the colour they're most likely to show.
+      for (const name of ['color', 'diffuse', 'uColor', 'baseColor', 'tint']) {
+        const u = m.uniforms[name];
+        if (u && u.value && u.value.isColor) { message.color = colorOf(u.value); break; }
+      }
+      for (const name of ['map', 'tDiffuse', 'uMap', 'uTexture']) {
+        const u = m.uniforms[name];
+        if (u && u.value && u.value.isTexture) { message.map = sendTexture(u.value, out); break; }
+      }
+      const opacity = m.uniforms.opacity || m.uniforms.uOpacity;
+      if (opacity && typeof opacity.value === 'number') message.opacity = opacity.value;
+    }
+    out.push(message);
+    return id;
+  }
+
+  const sentTexture = new Map(); // id -> { version, at }
+  let scratch = null;
+  function sendTexture(texture, out) {
+    const id = idOf(texture);
+    const sent = sentTexture.get(id);
+    const now = performance.now();
+    if (sent && (sent.version === texture.version || now - sent.at < TEXTURE_RESEND_MS)) return id;
+    const image = texture.image;
+    if (!image) return id;
+    const width = image.videoWidth || image.width, height = image.videoHeight || image.height;
+    if (!width || !height) return id; // not loaded yet: sent when its version changes
+    sentTexture.set(id, { version: texture.version, at: now });
+    try {
+      const scale = Math.min(1, MAX_TEXTURE / Math.max(width, height));
+      const w = Math.max(1, Math.round(width * scale)), h = Math.max(1, Math.round(height * scale));
+      scratch = scratch || document.createElement('canvas');
+      scratch.width = w; scratch.height = h;
+      const g = scratch.getContext('2d');
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, w, h);
+      // Images three.js flips on upload (flipY) come out the right way up in Unity as they are; the rest (data textures,
+      // flipY = false) are drawn upside down here so they match too.
+      const flip = !!image.data || texture.flipY === false;
+      if (flip) g.setTransform(1, 0, 0, -1, 0, h);
+      if (image.data) {
+        // A DataTexture: rows of RGBA (or RGB/R) values, bytes or floats.
+        const data = image.data, channels = Math.round(data.length / (width * height)) || 4;
+        const pixels = new ImageData(width, height);
+        const toByte = (v) => (data instanceof Float32Array || data instanceof Uint16Array && texture.type === 1016 /* HalfFloat */)
+          ? Math.max(0, Math.min(255, Math.round(v * 255))) : v;
+        for (let i = 0, p = 0; i < width * height; i++, p += 4) {
+          const s = i * channels;
+          const r = toByte(data[s]);
+          pixels.data[p] = r;
+          pixels.data[p + 1] = channels > 1 ? toByte(data[s + 1]) : r;
+          pixels.data[p + 2] = channels > 2 ? toByte(data[s + 2]) : r;
+          pixels.data[p + 3] = channels > 3 ? toByte(data[s + 3]) : 255;
+        }
+        const full = document.createElement('canvas');
+        full.width = width; full.height = height;
+        full.getContext('2d').putImageData(pixels, 0, 0);
+        g.drawImage(full, 0, 0, w, h);
+      } else {
+        g.drawImage(image, 0, 0, w, h);
+      }
+      const png = scratch.toDataURL('image/png');
+      out.push({
+        t: 'tex', id, w, h, png: png.substring(png.indexOf(',') + 1),
+        srgb: texture.colorSpace === 'srgb' || texture.encoding === 3001, wrapS: texture.wrapS, wrapT: texture.wrapT,
+        repeat: [texture.repeat.x, texture.repeat.y], offset: [texture.offset.x, texture.offset.y], rotation: texture.rotation || 0,
+      });
+    } catch (e) {
+      warn(`Texture ${texture.name || id} couldn't be read (${e.message}).`);
+    }
+    return id;
+  }
+
+  // ---------------------------------------------------------------- the scene, every frame
+
+  const nodes = new Map();     // id -> { object, matrix: Float32Array(16), visible, extra }
+  const instanceVersions = new Map();
+  const sentCamera = new Float32Array(7).fill(NaN);
+
+  /** The camera's world position, the way it looks and its vertical field of view, when they changed since last sent. */
+  function cameraChange(camera) {
+    const e = camera.matrixWorld.elements;
+    const length = Math.hypot(e[8], e[9], e[10]) || 1;
+    const now = [e[12], e[13], e[14], -e[8] / length, -e[9] / length, -e[10] / length, camera.fov || 0];
+    let changed = false;
+    for (let i = 0; i < 7 && !changed; i++)
+      changed = !(Math.abs(now[i] - sentCamera[i]) <= (i < 3 ? 1e-4 * Math.max(1, Math.abs(now[i])) : 1e-4));
+    if (!changed) return undefined;
+    sentCamera.set(now);
+    return now;
+  }
+
+  function kindOf(o) {
+    if (o.isInstancedMesh) return 'instanced';
+    if (o.isSkinnedMesh) return 'skinned';
+    if (o.isMesh) return 'mesh';
+    if (o.isPoints) return 'points';
+    if (o.isLineSegments) return 'segments';
+    if (o.isLine) return 'line';
+    if (o.isSprite) return 'sprite';
+    if (o.isLight) return 'light';
+    return 'node';
+  }
+
+  // Written so a matrix not sent yet (NaN) is never the same: NaN fails every comparison.
+  function sameMatrix(a, b) {
+    for (let i = 0; i < 16; i++) if (!(Math.abs(a[i] - b[i]) <= EPSILON)) return false;
+    return true;
+  }
+
+  function describeNode(o, parentId, out) {
+    const kind = kindOf(o);
+    const node = { id: idOf(o), parent: parentId, kind, name: o.name || '', order: o.renderOrder || 0 };
+    if (o.userData && o.userData.actorId) node.actor = String(o.userData.actorId);
+    if (kind === 'mesh' || kind === 'skinned' || kind === 'instanced' || kind === 'points' || kind === 'line' || kind === 'segments' || kind === 'sprite') {
+      if (o.geometry) node.geo = sendGeometry(o.geometry, out);
+      const materials = Array.isArray(o.material) ? o.material : [o.material];
+      node.mats = materials.filter(Boolean).map((m) => sendMaterial(m, out));
+    }
+    if (kind === 'skinned' && o.skeleton) {
+      node.bones = o.skeleton.bones.map((b) => idOf(b));
+      const inverses = new Float32Array(o.skeleton.boneInverses.length * 16);
+      o.skeleton.boneInverses.forEach((m, i) => inverses.set(m.elements, i * 16));
+      node.boneInverses = base64(inverses);
+      node.bindMatrix = Array.from(o.bindMatrix.elements);
+    }
+    if (kind === 'light') {
+      node.light = {
+        type: o.type, color: colorOf(o.color), intensity: o.intensity, distance: o.distance || 0, decay: o.decay,
+        angle: o.angle, penumbra: o.penumbra, ground: colorOf(o.groundColor), shadows: !!o.castShadow,
+      };
+    }
+    return node;
+  }
+
+  /** Everything under the main scene except cameras (and what's attached to them) and objects the camera can't see. */
+  function walk(scene, camera, visit) {
+    const stack = [];
+    for (let i = scene.children.length - 1; i >= 0; i--) stack.push([scene.children[i], 0]);
+    while (stack.length) {
+      const [o, parentId] = stack.pop();
+      if (o.isCamera) continue;
+      visit(o, parentId);
+      const id = idOf(o);
+      for (let i = o.children.length - 1; i >= 0; i--) stack.push([o.children[i], id]);
+    }
+  }
+
+  let trailingSync = 0;
+  function sync() {
+    if (!state.started || !state.main) return;
+    const now = performance.now();
+    if (now - state.lastSync < 8) {
+      // At most once per display frame, but never miss the last thing the page drew (pages render a few moments back
+      // to back while they load, then wait): sync once more just after.
+      if (!trailingSync) trailingSync = setTimeout(() => { trailingSync = 0; sync(); }, 10);
+      return;
+    }
+    state.lastSync = now;
+    state.frame++;
+    const { scene, camera } = state.main;
+    const out = [];            // geo/mat/tex messages first, then the frame
+    const add = [], matrices = [], visibility = [], instances = [], lights = [];
+    const seen = new Set();
+    walk(scene, camera, (o, parentId) => {
+      const id = idOf(o);
+      seen.add(id);
+      let node = nodes.get(id);
+      const visible = o.visible !== false && (!camera.layers || camera.layers.test(o.layers));
+      if (!node) {
+        node = { object: o, matrix: new Float32Array(16).fill(NaN), visible: null, parent: parentId };
+        nodes.set(id, node);
+        add.push(describeNode(o, parentId, out));
+      } else if (node.parent !== parentId) {
+        node.parent = parentId;
+        add.push(describeNode(o, parentId, out)); // re-parented: described again
+        node.matrix.fill(NaN);
+      } else if (o.material) {
+        const materials = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of materials) if (m) sendMaterial(m, out); // picks up colour/opacity animation and swapped textures
+        if (o.geometry) sendGeometry(o.geometry, out);
+      }
+      if (!sameMatrix(node.matrix, o.matrix.elements)) {
+        node.matrix.set(o.matrix.elements);
+        matrices.push(id, ...o.matrix.elements);
+      }
+      if (node.visible !== visible) {
+        node.visible = visible;
+        visibility.push(id, visible ? 1 : 0);
+      }
+      if (o.isInstancedMesh) {
+        const version = o.instanceMatrix.version + ':' + o.count;
+        if (instanceVersions.get(id) !== version) {
+          instanceVersions.set(id, version);
+          instances.push({ id, count: o.count, m: base64(o.instanceMatrix.array.subarray(0, o.count * 16)) });
+        }
+      }
+      if (o.isLight && (o.isDirectionalLight || o.isSpotLight) && o.target) {
+        const from = o.getWorldPosition(new o.position.constructor());
+        const to = o.target.getWorldPosition(new o.position.constructor());
+        lights.push(id, to.x - from.x, to.y - from.y, to.z - from.z, o.intensity);
+      }
+    });
+    const removed = [];
+    for (const id of nodes.keys()) if (!seen.has(id)) { removed.push(id); nodes.delete(id); }
+    for (const message of out) post(message);
+    const cam = cameraChange(camera); // what the page shows: ImmersiveX keeps it at the placed content's centre
+    if (add.length || removed.length || matrices.length || visibility.length || instances.length || lights.length || cam || state.frame % 30 === 1)
+      post({ t: 'frame', n: state.frame, add, del: removed, m: matrices, vis: visibility, inst: instances, lights, cam, sel: selectables() });
+  }
+
+  // ---------------------------------------------------------------- what can be picked up
+
+  let lastSelectables = '';
+  function selectables() {
+    const list = [];
+    const player = window.__player;
+    if (player && player.actors && typeof player.actors.values === 'function') {
+      for (const actor of player.actors.values()) {
+        if (!actor.root) continue;
+        const info = actor.info || {};
+        list.push({ id: String(actor.id), root: idOf(actor.root), title: info.title || actor.name || actor.id,
+          info: info.subtitle || (info.facts && info.facts[0]) || '' });
+      }
+    } else if (state.main) {
+      // Any page: the top-level things in the scene (one level down while there's a single one).
+      let level = state.main.scene.children.filter(isThing);
+      while (level.length === 1 && level[0].children.filter(isThing).length > 1) level = level[0].children.filter(isThing);
+      level.forEach((o, i) => list.push({ id: 'o' + idOf(o), root: idOf(o), title: o.name || `Part ${i + 1}`, info: '' }));
+    }
+    const text = JSON.stringify(list);
+    if (text === lastSelectables && state.frame % 120 !== 1) return undefined; // unchanged: not sent again
+    lastSelectables = text;
+    return list;
+  }
+
+  function isThing(o) {
+    if (!o.visible || o.isCamera || o.isLight) return false;
+    let mesh = false;
+    o.traverseVisible((c) => { if (!mesh && (c.isMesh || c.isPoints) && !(c.material && c.material.isShadowMaterial)) mesh = true; });
+    return mesh;
+  }
+
+  // ---------------------------------------------------------------- the page as a panel
+
+  const hidden = new WeakSet();
+  function hideCanvas(canvas) {
+    if (!canvas || hidden.has(canvas)) return;
+    hidden.add(canvas);
+    canvas.style.setProperty('visibility', 'hidden', 'important');
+    // Everything around the 3D view becomes see-through, so the panel shows only the page's controls and text.
+    for (let e = canvas.parentElement; e && e !== document.documentElement; e = e.parentElement)
+      e.style.setProperty('background', 'transparent', 'important');
+  }
+
+  function transparentPage() {
+    const style = document.createElement('style');
+    style.textContent = 'html, body { background: transparent !important; }';
+    (document.head || document.documentElement).appendChild(style);
+    for (const r of state.renderers) hideCanvas(r.domElement);
+  }
+
+  // ---------------------------------------------------------------- holding the page (its content is hidden)
+
+  // A page's own player can't be paused from outside in general, so its time is held instead: its animation frames wait,
+  // the clocks it reads (performance.now, Date.now, frame times) stand still and its sound pauses. Released, it carries on
+  // exactly where it was, in step with its sound.
+  const realNow = performance.now.bind(performance);
+  const realDateNow = Date.now.bind(Date);
+  const realRaf = window.requestAnimationFrame.bind(window);
+  const realCancelRaf = window.cancelAnimationFrame.bind(window);
+  const realPlay = HTMLMediaElement.prototype.play;
+  const held = { at: -1, total: 0, frames: new Map(), nextFrame: -1, media: new Set(), contexts: new Set(), resumeMedia: [], resumeContexts: [] };
+  const heldNow = () => (held.at >= 0 ? held.at : realNow()) - held.total;
+
+  performance.now = heldNow;
+  Date.now = () => realDateNow() - (realNow() - heldNow());
+  window.requestAnimationFrame = function (callback) {
+    if (held.at >= 0) {
+      const id = held.nextFrame--;
+      held.frames.set(id, callback);
+      return id;
+    }
+    return realRaf((time) => callback(Math.min(time - held.total, heldNow())));
+  };
+  window.cancelAnimationFrame = function (id) {
+    if (id < 0) held.frames.delete(id);
+    else realCancelRaf(id);
+  };
+  // Whether the page plays sound or video, sent when it changes (ImmersiveX keeps parts still while it plays).
+  let mediaPlaying = false;
+  function mediaState() {
+    let playing = false;
+    for (const m of new Set([...held.media, ...document.querySelectorAll('audio, video')]))
+      if (!m.paused && !m.ended) { playing = true; break; }
+    if (playing !== mediaPlaying) { mediaPlaying = playing; post({ t: 'media', playing }); }
+  }
+  for (const type of ['play', 'playing', 'pause', 'ended']) document.addEventListener(type, mediaState, true);
+
+  HTMLMediaElement.prototype.play = function () {
+    if (!held.media.has(this)) // not in the document (new Audio()): its own events tell us
+      for (const type of ['play', 'playing', 'pause', 'ended']) this.addEventListener(type, mediaState);
+    held.media.add(this);
+    if (held.at >= 0) {
+      if (!held.resumeMedia.includes(this)) held.resumeMedia.push(this); // plays when released
+      return Promise.resolve();
+    }
+    return realPlay.apply(this, arguments);
+  };
+  for (const name of ['AudioContext', 'webkitAudioContext']) {
+    const Base = window[name];
+    if (typeof Base !== 'function') continue;
+    try {
+      window[name] = class extends Base { constructor(...args) { super(...args); held.contexts.add(this); } };
+    } catch (e) { /* left as it is */ }
+  }
+
+  function holdPage() {
+    if (held.at >= 0) return;
+    held.at = realNow();
+    held.resumeMedia = [];
+    held.resumeContexts = [];
+    for (const m of new Set([...held.media, ...document.querySelectorAll('audio, video')]))
+      if (!m.paused) { m.pause(); held.resumeMedia.push(m); }
+    for (const context of held.contexts)
+      if (context.state === 'running') { context.suspend(); held.resumeContexts.push(context); }
+  }
+
+  function releasePage() {
+    if (held.at < 0) return;
+    held.total += realNow() - held.at;
+    held.at = -1;
+    for (const m of held.resumeMedia) { const playing = realPlay.call(m); if (playing && playing.catch) playing.catch(() => {}); }
+    for (const context of held.resumeContexts) context.resume();
+    const frames = [...held.frames.values()];
+    held.frames.clear();
+    for (const callback of frames) realRaf((time) => callback(Math.min(time - held.total, heldNow())));
+  }
+
+  // ---------------------------------------------------------------- ImmersiveX's side
+
+  window.__ixBridge = {
+    version: 1,
+    command(message) {
+      if (typeof message === 'string') message = JSON.parse(message);
+      switch (message.t) {
+        case 'start':
+          state.started = true;
+          state.mirroring = !!message.mirror;
+          state.uiOnly = !!message.uiOnly;
+          if (state.uiOnly) transparentPage();
+          nodes.clear(); sentGeometry.clear(); sentMaterial.clear(); sentTexture.clear(); instanceVersions.clear(); lastSelectables = '';
+          sentCamera.fill(NaN);
+          hello();
+          break;
+        case 'stop':
+          state.started = false;
+          break;
+        case 'hold': // the content is hidden: the page waits where it is
+          holdPage();
+          break;
+        case 'release':
+          releasePage();
+          break;
+        case 'resend':
+          nodes.clear(); sentGeometry.clear(); sentMaterial.clear(); sentTexture.clear(); instanceVersions.clear(); lastSelectables = '';
+          sentCamera.fill(NaN);
+          break;
+        case 'eval': {
+          // Diagnostics: run code in the page and post what it returns.
+          let result;
+          try { result = String(Function(message.code)()); } catch (e) { result = 'error: ' + e.message; }
+          post({ t: 'log', level: 'info', text: 'eval: ' + result });
+          return result;
+        }
+      }
+      return 'ok';
+    },
+    stats() {
+      return { revision: state.revision, renderers: state.renderers.size, scenes: state.scenes.size, nodes: nodes.size,
+        geometries: sentGeometry.size, materials: sentMaterial.size, textures: sentTexture.size, frame: state.frame,
+        main: !!state.main };
+    },
+  };
+
+  function hello() {
+    post({ t: 'hello', bridge: 1, three: state.revision, title: document.title, url: location.href,
+      adapter: window.__player ? 'genxr-player' : 'three', main: !!state.main });
+  }
+
+  // ---------------------------------------------------------------- the page's own state
+
+  // When the page has finished loading: pages that say so (window.__ready = true, as GenXR pages and headless renderers
+  // do) are placed then; others once the load event has fired and their scene stands still.
+  try {
+    let readyValue = window.__ready;
+    Object.defineProperty(window, '__ready', {
+      configurable: true,
+      get() { return readyValue; },
+      set(value) { readyValue = value; if (value) post({ t: 'ready' }); },
+    });
+  } catch (e) { /* the page defines it its own way */ }
+  addEventListener('load', () => post({ t: 'pageload' }));
+
+  addEventListener('error', (e) => post({ t: 'log', level: 'error', text: e.message || String(e) }));
+  addEventListener('unhandledrejection', (e) => post({ t: 'log', level: 'error', text: String(e.reason && e.reason.message || e.reason) }));
+  post({ t: 'loaded', url: location.href });
+})();

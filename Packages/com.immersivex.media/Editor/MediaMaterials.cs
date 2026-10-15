@@ -21,6 +21,8 @@ namespace ImmersiveX.Media.Editor
             ("VolumetricUnlit", "ImmersiveX/Volumetric Unlit", null),
             ("MeshLit", "Universal Render Pipeline/Simple Lit", null),
             ("PhotoTransparent", "Universal Render Pipeline/Unlit", new[] { "_SURFACE_TYPE_TRANSPARENT" }),
+            ("Mesh4D", "ImmersiveX/Mesh 4D", null),
+            ("Mesh4DPaint", "Hidden/ImmersiveX/Mesh 4D Paint", null),
             ("glTF/Metallic", "Shader Graphs/glTF-pbrMetallicRoughness", null),
             ("glTF/MetallicEmissive", "Shader Graphs/glTF-pbrMetallicRoughness", new[] { "_EMISSIVE" }),
             ("glTF/MetallicOcclusion", "Shader Graphs/glTF-pbrMetallicRoughness", new[] { "_OCCLUSION" }),

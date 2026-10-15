@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.XR;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
-using UnityEngine.XR.Interaction.Toolkit.Attachment;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 namespace ImmersiveX.Media
@@ -22,6 +21,8 @@ namespace ImmersiveX.Media
         [InspectorName("Flat video or photo")] Video,
         [InspectorName("360° video or photo")] Video360,
         [InspectorName("180° video or photo")] Video180,
+        [InspectorName("Web page (three.js)")] WebPage,
+        [InspectorName("4D mesh (.sp4m)")] Mesh4D,
     }
 
     public enum MediaPlacement
@@ -37,9 +38,11 @@ namespace ImmersiveX.Media
     /// <item>GenXR 3.5D holograms and packed 4D splat captures (<c>stream.json</c>), Gaussian splats
     /// (<c>.ply .splat .spz .ksplat</c>), point clouds (<c>.ply</c>), models (<c>.glb .gltf</c>, including Draco and KTX2),
     /// meshes (<c>.obj .ply .stl</c>), frame sequences (a sequence <c>.json</c> or a folder of frames), video
-    /// (<c>.mp4 .m4v .mov .webm</c>) and photos (<c>.jpg .png</c>): flat, 180° or 360°, mono or stereo.</item>
+    /// (<c>.mp4 .m4v .mov .webm</c>) and photos (<c>.jpg .png</c>): flat, 180° or 360°, mono or stereo; 4D meshes
+    /// (<c>.sp4m</c>, <c>.sp4m.gz</c>: a scene baked over time, with its captions and callouts).</item>
     /// <item>Standing media is fitted to <see cref="Height"/> with its feet on the floor, at the centre of the mapped room,
-    /// facing the user. Grab it to slide it across the floor; it turns about the up axis only.</item>
+    /// facing the user. Grab it with a hand or controller at it to slide it across the floor; it turns about the up axis
+    /// only. The ray from a hand or controller only clicks (see <see cref="DirectGrabOnly"/>).</item>
     /// <item>It moves only when the user moves it. Where it's put is kept with a spatial anchor (see
     /// <see cref="ContentAnchor"/>), so it stays in the same real spot when the headset comes off and after a relaunch.</item>
     /// <item>Flat video and photos are an upright screen; 180°/360° video and photos surround the user.</item>
@@ -48,7 +51,7 @@ namespace ImmersiveX.Media
     /// </summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("ImmersiveX/Media/Immersive Media")]
-    public sealed class ImmersiveMedia : MonoBehaviour, IMediaTransport
+    public sealed class ImmersiveMedia : MonoBehaviour, IMediaTransport, IHandleTarget, IContentItem
     {
         const float StatusLogSeconds = 10f;
         const float ColliderRefreshSeconds = 0.5f;
@@ -105,6 +108,11 @@ namespace ImmersiveX.Media
         [SerializeField, Tooltip("Show the side handles: a move bar under the controls, turn bars at the sides and a resize corner.")]
         bool _showHandles = true;
 
+        [SerializeField, Tooltip("Content with several pieces (a model's meshes, a web scene's actors): a ray click selects a piece " +
+                                 "(click again for the assembly it's in) and a hand at it picks it up. The handles then move the whole. " +
+                                 "Off: the whole is grabbed as one piece.")]
+        bool _selectableParts = true;
+
         [Header("Streaming and detail")]
         [SerializeField, Tooltip("Hologram streams: the quality tier (base, low, medium, high, full). Base streams the fewest bytes.")]
         string _quality = "base";
@@ -124,7 +132,8 @@ namespace ImmersiveX.Media
         IMediaPlayable _playable;
         Transform _content;
         MediaControls _controls;
-        MediaHandles _handles;
+        MediaCallouts _callouts;
+        ContentHandles _handles;
         float _loadHeight = 1.6f;
         FloorGrabTransformer _grabber;
         XRGrabInteractable _grab;
@@ -137,6 +146,9 @@ namespace ImmersiveX.Media
         bool _resumeAfterPause;
         bool _muted;
         bool _loading;
+        bool _hiddenByMenu;
+        bool? _ownControlsShown;
+        bool _bodyGrab = true;
         float _nextStatusLog;
         float _nextCollider;
         float _fps;
@@ -168,6 +180,10 @@ namespace ImmersiveX.Media
 
         /// <summary>The media's controls, once placed (null when they're hidden).</summary>
         public MediaControls Controls => _controls;
+
+        Transform IHandleTarget.Root => transform;
+
+        Transform IHandleTarget.Controls => _controls != null ? _controls.transform : null;
 
         /// <summary>The visible media's bounds in world space (for handles and layout).</summary>
         public Bounds WorldBounds
@@ -207,6 +223,8 @@ namespace ImmersiveX.Media
 
         public void Play()
         {
+            if (_hiddenByMenu)
+                return; // hidden by the content menu: it plays once it's shown and Play is pressed
             if (_playable != null && _playable.IsLoaded && _playable.Duration <= 0d)
                 return; // a still: nothing to play
             _wantPlaying = true;
@@ -301,7 +319,7 @@ namespace ImmersiveX.Media
             _content = new GameObject("Content").transform;
             _content.SetParent(transform, false);
 
-            _collider = gameObject.AddComponent<BoxCollider>();
+            _collider = ContentLayer.CreateBody(transform).AddComponent<BoxCollider>(); // hands grab it; rays pass through it
             SizeCollider(new Bounds(new Vector3(0f, _height * 0.5f, 0f), new Vector3(0.6f, _height, 0.6f)));
 
             var body = GetComponent<Rigidbody>();
@@ -317,7 +335,7 @@ namespace ImmersiveX.Media
             _grab.trackScale = false;
             _grab.throwOnDetach = false;
             _grab.useDynamicAttach = true;
-            _grab.farAttachMode = InteractableFarAttachMode.Far; // a far grab moves from where the ray hit
+            DirectGrabOnly.Apply(_grab); // the ray only clicks; moving it takes a hand or controller at it
             _grabber = gameObject.AddComponent<FloorGrabTransformer>();
             _grab.selectExited.AddListener(_ =>
             {
@@ -386,6 +404,7 @@ namespace ImmersiveX.Media
                 Stereo = _stereo,
                 FrameRate = _frameRate,
                 MaxGaussians = _maxGaussians > 0 ? _maxGaussians : DefaultMaxGaussians,
+                SelectableParts = _selectableParts,
                 ParallelDownloads = _parallelDownloads,
                 BufferSeconds = _bufferSeconds,
                 PrerollSeconds = _prerollSeconds,
@@ -443,6 +462,8 @@ namespace ImmersiveX.Media
                 Destroy(_controls.gameObject);
             if (_handles != null)
                 Destroy(_handles.gameObject);
+            if (_callouts != null)
+                Destroy(_callouts.gameObject);
         }
 
         void OnApplicationPause(bool paused)
@@ -479,6 +500,14 @@ namespace ImmersiveX.Media
 
         void LateUpdate()
         {
+            if (_hiddenByMenu)
+            {
+                Show(false); // another piece of content is showing (content menu)
+                if (_callouts != null)
+                    _callouts.Show(null, null, false);
+                return;
+            }
+
             if (_playable == null || !_playable.IsLoaded)
                 return;
             var viewer = Viewer();
@@ -492,6 +521,21 @@ namespace ImmersiveX.Media
 
             Show(_placed && !lost);
 
+            // Narrated media: its caption on the controls, its callouts as cards beside the parts they explain.
+            if (_playable is IMediaAnnotations notes)
+            {
+                if (_callouts == null)
+                    _callouts = MediaCallouts.Create(Name);
+                var visible = _placed && !lost;
+                _callouts.Show(notes.Callouts, viewer, visible);
+                if (_controls != null)
+                    _controls.SetCaption(visible ? notes.Caption : null);
+            }
+
+            // Parts move only while the content is paused, so a hand reaching through playing content never moves it.
+            if (_playable is IMediaParts withParts && withParts.Parts != null)
+                withParts.Parts.Movable = !(_playable is IMediaOwnControls own ? own.IsPlaying : _wantPlaying);
+
             if (_playable.Presentation != MediaPresentation.Surround && !_grabber.IsHeld && Time.unscaledTime >= _nextCollider)
             {
                 _nextCollider = Time.unscaledTime + ColliderRefreshSeconds;
@@ -499,15 +543,62 @@ namespace ImmersiveX.Media
             }
         }
 
-        /// <summary>Show or hide the media with its controls and handles: hidden until placed, and while its anchor is lost.</summary>
+        /// <summary>
+        /// Show or hide the media with its controls, handles and grab: hidden until placed, while its anchor is lost, and while
+        /// the content menu shows something else.
+        /// </summary>
         void Show(bool shown)
         {
             if (_content.gameObject.activeSelf != shown)
                 _content.gameObject.SetActive(shown);
+            if (_playable is IMediaOwnControls own && _ownControlsShown != shown)
+            {
+                _ownControlsShown = shown;
+                own.SetShown(shown); // a web page's panel, and the page waiting while it's hidden
+            }
+
             if (_controls != null && _controls.gameObject.activeSelf != shown)
                 _controls.gameObject.SetActive(shown);
             if (_handles != null && _handles.gameObject.activeSelf != shown)
                 _handles.gameObject.SetActive(shown);
+            var grab = shown && _bodyGrab;
+            if (_grab.enabled != grab)
+                _grab.enabled = grab;
+            if (_collider.enabled != grab)
+                _collider.enabled = grab;
+        }
+
+        // ---------------------------------------------------------------- content menu (IContentItem)
+
+        string IContentItem.Key => PlacementKey;
+
+        string IContentItem.Title => Name;
+
+        string IContentItem.Kind
+        {
+            get
+            {
+                if (_playable == null || !_playable.IsLoaded)
+                    return _status != null && _status != "Loading…" ? "Can't play" : "Loading…";
+                var description = _playable.Description;
+                var dot = description.IndexOf(" · ", StringComparison.Ordinal);
+                return dot > 0 ? description.Substring(0, dot) : description;
+            }
+        }
+
+        /// <summary>False while the content menu shows something else.</summary>
+        public bool IsShown => !_hiddenByMenu;
+
+        /// <summary>Show or hide it (the content menu). Hiding pauses it; showing it again leaves it paused.</summary>
+        public void SetShown(bool shown)
+        {
+            if (_hiddenByMenu == !shown)
+                return;
+            if (!shown)
+                Pause();
+            _hiddenByMenu = !shown;
+            if (!shown)
+                Show(false);
         }
 
         void ApplyVolume() => _playable?.SetVolume(_muted ? 0f : _volume);
@@ -525,12 +616,19 @@ namespace ImmersiveX.Media
             _collider.size = new Vector3(Mathf.Clamp(size.x, 0.3f, 4f), Mathf.Max(size.y, 0.3f), Mathf.Clamp(size.z, 0.3f, 4f));
         }
 
-        /// <summary>Surround media isn't grabbed or placed on the floor; standing media and screens are.</summary>
+        /// <summary>
+        /// Surround media isn't grabbed or placed on the floor; standing media and screens are. Content with selectable parts
+        /// isn't grabbed as a whole either: hands pick up its parts, and the handles move the whole.
+        /// </summary>
         void ConfigureForPresentation()
         {
             var surround = _playable.Presentation == MediaPresentation.Surround;
-            _grab.enabled = !surround;
-            _collider.enabled = !surround;
+            var parts = (_playable as IMediaParts)?.Parts;
+            _bodyGrab = !surround && parts == null;
+            _grab.enabled = _bodyGrab && !_hiddenByMenu;
+            _collider.enabled = _bodyGrab && !_hiddenByMenu;
+            if (parts != null)
+                ImmersiveXLog.Info($"Media: {Name} has {parts.Parts.Count} selectable parts: a ray click selects one, a hand picks it up; the handles move the whole.");
             if (surround)
             {
                 MediaLayout.Release(this); // surround media doesn't take a spot in the room
@@ -539,7 +637,7 @@ namespace ImmersiveX.Media
             }
             else if (_showHandles && _handles == null)
             {
-                _handles = MediaHandles.Create(this);
+                _handles = ContentHandles.Create(this);
             }
         }
 
@@ -654,8 +752,18 @@ namespace ImmersiveX.Media
         /// <summary>Put the controls where they suit the media: in front of it, under a screen, or in front of the user.</summary>
         void PlaceControls()
         {
-            if (!_showControls)
+            if (!_showControls || _playable is IMediaOwnControls)
+            {
+                // Content with its own player (a web page) shows its own controls instead.
+                if (_controls != null)
+                {
+                    Destroy(_controls.gameObject);
+                    _controls = null;
+                }
+
                 return;
+            }
+
             var head = Viewer();
             if (head == null)
                 return;

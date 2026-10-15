@@ -20,6 +20,15 @@ namespace ImmersiveX
         [SerializeField, Tooltip("Material for shapes ImmersiveX creates at runtime (markers, grab bars, outlines). Must use a URP shader.")]
         Material _runtimeMaterial;
 
+        [SerializeField, Tooltip("The content menu: a fast sideways swipe (right hand from right to left, or left hand from left to right) " +
+                                 "opens a menu listing the scene's content, and the same swipe closes it. One piece of content shows at a " +
+                                 "time: the one picked in the menu.")]
+        bool _contentMenu = true;
+
+        [SerializeField, Tooltip("A pointer (ray) from each hand, to click and drag from afar. Off: hands press buttons with a finger " +
+                                 "and pick things up, and only controllers show a pointer.")]
+        bool _handPointers;
+
         [Header("Room mapping")]
         [SerializeField, Range(0f, 1f), Tooltip("Keep this far from the walls, in metres, when working out where the user can walk.")]
         float _wallMargin = 0.3f;
@@ -43,6 +52,8 @@ namespace ImmersiveX
         float _showWalkableAreaSeconds = 6f;
 
         public float DefaultOpacity => _defaultOpacity;
+        public bool ContentMenu => _contentMenu;
+        public bool HandPointers => _handPointers;
         public Material RuntimeMaterial => _runtimeMaterial;
         public bool DisableLocomotionInSeeThrough => _disableLocomotionInSeeThrough;
         public float WallMargin => _wallMargin;

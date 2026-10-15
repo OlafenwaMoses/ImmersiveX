@@ -19,6 +19,8 @@ namespace ImmersiveX.Media
                 case MediaKind.Video: return new VideoPlayable(detection.Requested);
                 case MediaKind.Image: return new ImagePlayable(detection.Requested);
                 case MediaKind.Codec: return detection.Codec.Create(detection);
+                case MediaKind.Web: return new WebPlayable();
+                case MediaKind.Mesh4D: return new Mesh4DPlayable();
                 default: return new UnavailablePlayable($"{detection.Kind} playback is coming in the next step.");
             }
         }

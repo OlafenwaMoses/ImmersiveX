@@ -22,11 +22,14 @@ namespace ImmersiveX
 
         public static Font Font => _font != null ? _font : _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-        /// <summary>A world-space canvas of <paramref name="sizeMillimetres"/> with a background, under <paramref name="parent"/>.</summary>
+        /// <summary>
+        /// A world-space canvas of <paramref name="sizeMillimetres"/> with a background, under <paramref name="parent"/>. It's a
+        /// <see cref="PanelZones"/> zone, so a hand at it presses its buttons instead of grabbing what's nearby.
+        /// </summary>
         public static RectTransform CreateCanvas(Transform parent, Vector2 sizeMillimetres)
         {
             EnsureEventSystem();
-            var canvasObject = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas), typeof(TrackedDeviceGraphicRaycaster));
+            var canvasObject = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas), typeof(TrackedDeviceGraphicRaycaster), typeof(PanelZone));
             canvasObject.transform.SetParent(parent, false);
             canvasObject.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
             var root = (RectTransform)canvasObject.transform;

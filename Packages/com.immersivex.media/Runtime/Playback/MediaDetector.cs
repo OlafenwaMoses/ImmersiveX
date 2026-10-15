@@ -18,6 +18,8 @@ namespace ImmersiveX.Media
         Video,
         Image,
         Codec,
+        Web,
+        Mesh4D,
     }
 
     /// <summary>The result of <see cref="MediaDetector.Detect"/>.</summary>
@@ -135,8 +137,32 @@ namespace ImmersiveX.Media
                         yield break;
                     }
 
+                    var container = files.FirstOrDefault(Mesh4DContainer.IsContainerName);
+                    if (container != null)
+                    {
+                        detection.Url = MediaSource.Relative(url.TrimEnd('/') + "/", container); // a 4D mesh's folder (with its soundtrack)
+                        detection.Extension = MediaSource.Extension(detection.Url);
+                        detection.Kind = MediaKind.Mesh4D;
+                        done(detection);
+                        yield break;
+                    }
+
+                    if (files.Any(f => f.Equals("index.html", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        detection.Kind = MediaKind.Web; // a web page's folder (its index.html is the page)
+                        done(detection);
+                        yield break;
+                    }
+
                     detection.Kind = MediaKind.Sequence;
                     detection.FolderFiles = files;
+                    done(detection);
+                    yield break;
+                }
+
+                if (detection.Extension.Length == 0 && (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+                {
+                    detection.Kind = MediaKind.Web; // a web address without a file name: a web page
                     done(detection);
                     yield break;
                 }
@@ -152,6 +178,13 @@ namespace ImmersiveX.Media
             if (requested != MediaFormat.Auto)
             {
                 detection.Kind = KindOf(requested, detection.Extension);
+                done(detection);
+                yield break;
+            }
+
+            if (Mesh4DContainer.IsContainerName(MediaSource.FileName(url)))
+            {
+                detection.Kind = MediaKind.Mesh4D;
                 done(detection);
                 yield break;
             }
@@ -207,6 +240,11 @@ namespace ImmersiveX.Media
                     detection.Kind = MediaKind.Image;
                     break;
 
+                case ".html":
+                case ".htm":
+                    detection.Kind = MediaKind.Web;
+                    break;
+
                 case ".m3u8":
                 case ".mpd":
                     detection.Error = "Live streaming (HLS/DASH) isn't supported by Unity's video player; use a progressive MP4 or WebM over HTTPS.";
@@ -232,6 +270,8 @@ namespace ImmersiveX.Media
                 case MediaFormat.Model: return MediaKind.Model;
                 case MediaFormat.Mesh: return MediaKind.Mesh;
                 case MediaFormat.Sequence: return MediaKind.Sequence;
+                case MediaFormat.WebPage: return MediaKind.Web;
+                case MediaFormat.Mesh4D: return MediaKind.Mesh4D;
                 default: return IsImage(extension) ? MediaKind.Image : MediaKind.Video; // flat, 360° or 180°: a photo or a video
             }
         }

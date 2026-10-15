@@ -92,6 +92,13 @@ namespace ImmersiveX
             }
 
             Origin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.Floor;
+            WorldUi.EnsureEventSystem();
+            ContentClickRaycaster.Ensure();
+            ContentLayer.ConfigureRig(Origin); // rays pass through content bodies (they only click); hands reach them
+            var watched = ImmersiveX.HandPointers.Configure(Origin, Settings.HandPointers); // hands touch and grab; controllers point
+            ImmersiveXLog.Info(Settings.HandPointers
+                ? "Input: hands and controllers have pointers."
+                : $"Input: tracked hands have no pointer (they press and grab); controllers in hand do ({watched} interactors watched).");
 
             Enter(SessionState.ResolvePlatform);
             Platform = PlatformRegistry.ResolveActive();
@@ -130,6 +137,8 @@ namespace ImmersiveX
             ImmersiveXLog.Info($"Tracking origin: {Origin.CurrentTrackingOriginMode} · camera offset {cameraOffset:0.00} m · " +
                                $"head at {Origin.Camera.transform.position.y:0.00} m");
             PlaceContent();
+            if (Settings.ContentMenu)
+                ContentMenu.Create(Origin); // a fast sideways swipe opens it; one piece of content shows at a time
 
             Enter(SessionState.Ready);
         }

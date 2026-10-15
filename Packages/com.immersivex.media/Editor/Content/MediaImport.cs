@@ -61,6 +61,10 @@ namespace ImmersiveX.Media.Editor
                 isSplatFrames = frames.Length > 0;
                 if (File.Exists(Path.Combine(path, "stream.json")))
                     return "A hologram stream folder: " + (InStreamingAssets(path) ? "used where it is." : "copied into StreamingAssets.");
+                if (Directory.GetFiles(path).Any(f => Mesh4DContainer.IsContainerName(f)))
+                    return "A 4D mesh (its container and soundtrack): " + (InStreamingAssets(path) ? "used where it is." : "copied into StreamingAssets, so it plays offline.");
+                if (File.Exists(Path.Combine(path, "index.html")))
+                    return "A web page (its index.html): " + (InStreamingAssets(path) ? "used where it is." : "copied into StreamingAssets with its files, so it plays offline.");
                 if (isSplatFrames)
                     return $"{frames.Length} splat frames ({Path.GetExtension(frames[0])}): packed into a stream for the headset.";
                 var mediaFrames = Directory.GetFiles(path).Count(f => MediaSequence.FrameExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
@@ -108,7 +112,8 @@ namespace ImmersiveX.Media.Editor
                         if (fitHeight >= 0.2f && fitHeight <= 4f)
                             height = fitHeight; // captures are in metres: keep the real size
                         ImmersiveXLog.Info($"Packed {result.Frames} frames ({result.MaxGaussians:N0} Gaussians at most) into {mediaSource}: " +
-                                           $"{result.Bytes / 1e6:0} MB, {result.MegabytesPerSecond:0.#} MB/s to play.");
+                                           $"{result.Bytes / 1e6:0} MB, {result.MegabytesPerSecond:0.#} MB/s to play." +
+                                           (result.LeftOut > 0 ? $" Left out {result.LeftOut:N0} splats far outside the room (in {result.FramesLeftOutOf} frames)." : string.Empty));
                     }
                     else
                     {
@@ -222,10 +227,12 @@ namespace ImmersiveX.Media.Editor
                 File.Copy(Path.Combine(source, extra), target, overwrite: true);
             }
 
-            var copy = Path.Combine(folder, Path.GetFileName(file));
+            var copy = Path.Combine(folder, AndroidSafeName(Path.GetFileName(file)));
             File.Copy(file, copy, overwrite: true);
             return copy;
         }
+
+        static readonly HashSet<string> SkippedFolders = new HashSet<string> { "_work", "node_modules", ".git", "__pycache__" };
 
         static string CopyFolder(string folder, string name)
         {
@@ -235,13 +242,22 @@ namespace ImmersiveX.Media.Editor
                 var relative = file.Substring(folder.Length).TrimStart('/', '\\');
                 if (relative.EndsWith(".meta", StringComparison.Ordinal) || Path.GetFileName(relative).StartsWith(".", StringComparison.Ordinal))
                     continue;
-                var copy = Path.Combine(target, relative);
+                if (relative.Replace('\\', '/').Split('/').Any(part => SkippedFolders.Contains(part)))
+                    continue; // working files that don't ship (a generator's _work, node_modules, .git)
+                var copy = Path.Combine(target, Path.GetDirectoryName(relative) ?? string.Empty, AndroidSafeName(Path.GetFileName(relative)));
                 Directory.CreateDirectory(Path.GetDirectoryName(copy) ?? target);
                 File.Copy(file, copy, overwrite: true);
             }
 
             return target;
         }
+
+        /// <summary>
+        /// Android's packaging decompresses <c>.gz</c> assets and drops the extension, so the app couldn't find them by name.
+        /// A gzipped 4D mesh keeps its bytes and is named <c>.sp4m</c> (the player reads gzip either way).
+        /// </summary>
+        public static string AndroidSafeName(string name) =>
+            name.EndsWith(".sp4m.gz", StringComparison.OrdinalIgnoreCase) ? name.Substring(0, name.Length - 3) : name;
 
         static string TitleFor(string source)
         {

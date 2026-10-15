@@ -16,7 +16,9 @@ namespace ImmersiveX.Media.Editor
     /// <list type="bullet">
     /// <item>Each Gaussian takes 17 bytes, and frames upload to the GPU as they are.</item>
     /// <item>Colour is the view-independent part; spherical harmonics beyond the DC term aren't kept.</item>
-    /// <item>The stream gets one fit for the whole clip, so a character keeps its size when it raises an arm.</item>
+    /// <item>The stream gets one fit for the whole clip (<see cref="ClipFit"/>), so a character keeps its size when it raises an
+    /// arm and a scene stands on its ground.</item>
+    /// <item>What flies far out of the room (ten times the clip's height away) is left out.</item>
     /// <item>A sound file in the folder becomes the soundtrack.</item>
     /// </list>
     /// </summary>
@@ -32,6 +34,10 @@ namespace ImmersiveX.Media.Editor
 
             /// <summary>The stream's <c>stream.json</c>.</summary>
             public string Manifest;
+
+            /// <summary>Splats left out for being far outside the room, and how many frames had any.</summary>
+            public int LeftOut;
+            public int FramesLeftOutOf;
         }
 
         /// <summary>Formats the frames can be in.</summary>
@@ -76,55 +82,32 @@ namespace ImmersiveX.Media.Editor
                 File.Delete(old); // an earlier pack's frames
 
             var range = ScaleRange(frames);
+
+            // First where the capture stands in each frame, for the clip's one fit; then the frames themselves.
+            var fits = new HologramFit?[frames.Count];
+            ForEachFrame(frames.Count, 0f, progress, i =>
+            {
+                var cloud = Decode(frames[i], up).Strongest(maxGaussians);
+                if (cloud.Count > 0)
+                    fits[i] = FitOf(cloud);
+            });
+            var fit = ClipFit(fits);
+
+            var centre = new Vector3(fit.CentreX, 0.5f * (fit.Top + fit.Bottom), fit.CentreZ);
+            var reach = fit.Height > 0.05f ? FarAway * fit.Height : float.PositiveInfinity; // a flat clip has no height to judge by
             var counts = new int[frames.Count];
             var sizes = new int[frames.Count];
-            var fits = new HologramFit?[frames.Count];
-            var done = 0;
-            var cancelled = false;
-            var work = Task.Run(() => Parallel.For(0, frames.Count, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1) },
-                (i, state) =>
-                {
-                    if (Volatile.Read(ref cancelled))
-                    {
-                        state.Stop();
-                        return;
-                    }
-
-                    var cloud = Decode(frames[i], up);
-                    if (maxGaussians > 0 && cloud.Count > maxGaussians)
-                        cloud = cloud.Strongest(maxGaussians);
-                    var data = SplatPacker.Pack(cloud, range, out var header, out _);
-                    var bytes = new byte[data.Length * 4];
-                    Buffer.BlockCopy(data, 0, bytes, 0, bytes.Length);
-                    File.WriteAllBytes(Path.Combine(tierFolder, i.ToString("D6", CultureInfo.InvariantCulture) + ".bin"), bytes);
-                    counts[i] = cloud.Count;
-                    sizes[i] = bytes.Length;
-                    if (cloud.Count > 0)
-                        fits[i] = HologramFrame.Fit(cloud.Positions, cloud.Count, header.Min.y, header.Max.y, new int[256]);
-                    Interlocked.Increment(ref done);
-                }));
-            while (!work.IsCompleted)
+            var leftOut = new int[frames.Count];
+            ForEachFrame(frames.Count, 0.5f, progress, i =>
             {
-                if (progress != null && !progress(Volatile.Read(ref done) / (float)frames.Count))
-                    Volatile.Write(ref cancelled, true);
-                Thread.Sleep(50);
-            }
-
-            if (work.IsFaulted)
-                throw work.Exception.GetBaseException();
-            if (cancelled)
-                throw new OperationCanceledException("Packing was cancelled.");
-
-            var fitted = fits.Where(f => f.HasValue).Select(f => f.Value).ToArray();
-            if (fitted.Length == 0)
-                throw new FormatException("Every frame is empty.");
-            var fit = new HologramFit
-            {
-                CentreX = fitted.Average(f => f.CentreX),
-                CentreZ = fitted.Average(f => f.CentreZ),
-                Top = Median(fitted.Select(f => f.Top)), // the usual standing height, not the highest reach
-                Bottom = Median(fitted.Select(f => f.Bottom)),
-            };
+                var cloud = Decode(frames[i], up).Within(centre, reach, out leftOut[i]).Strongest(maxGaussians);
+                var data = SplatPacker.Pack(cloud, range, out _, out _);
+                var bytes = new byte[data.Length * 4];
+                Buffer.BlockCopy(data, 0, bytes, 0, bytes.Length);
+                File.WriteAllBytes(Path.Combine(tierFolder, i.ToString("D6", CultureInfo.InvariantCulture) + ".bin"), bytes);
+                counts[i] = cloud.Count;
+                sizes[i] = bytes.Length;
+            });
 
             var audio = Directory.GetFiles(Path.GetDirectoryName(frames[0]) ?? ".")
                 .FirstOrDefault(f => AudioExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
@@ -139,7 +122,83 @@ namespace ImmersiveX.Media.Editor
             var rate = total / (double)frames.Count * fps / 1e6;
             var manifest = Path.Combine(output, "stream.json");
             File.WriteAllText(manifest, Manifest(title, fps, range, fit, audioFile, counts, sizes, rate));
-            return new Result { Frames = frames.Count, MaxGaussians = counts.Max(), Bytes = total, MegabytesPerSecond = rate, Fit = fit, Manifest = manifest };
+            return new Result
+            {
+                Frames = frames.Count, MaxGaussians = counts.Max(), Bytes = total, MegabytesPerSecond = rate, Fit = fit, Manifest = manifest,
+                LeftOut = leftOut.Sum(), FramesLeftOutOf = leftOut.Count(n => n > 0),
+            };
+        }
+
+        /// <summary>
+        /// The clip's one fit, from each frame's (null for an empty frame): the usual centre and height (medians), standing on
+        /// the ground the clip comes down to (the 90th percentile of the frames' lowest points, y being down). A character
+        /// keeps its size when it raises an arm or jumps, a scene whose parts lift off for a while still stands on its ground,
+        /// and frames where something flies far away don't move it.
+        /// </summary>
+        public static HologramFit ClipFit(IReadOnlyList<HologramFit?> fits)
+        {
+            var fitted = fits.Where(f => f.HasValue).Select(f => f.Value).ToArray();
+            if (fitted.Length == 0)
+                throw new FormatException("Every frame is empty.");
+            return new HologramFit
+            {
+                CentreX = Quantile(fitted.Select(f => f.CentreX), 0.5f),
+                CentreZ = Quantile(fitted.Select(f => f.CentreZ), 0.5f),
+                Top = Quantile(fitted.Select(f => f.Top), 0.5f), // the usual height, not the highest reach
+                Bottom = Quantile(fitted.Select(f => f.Bottom), 0.9f),
+            };
+        }
+
+        /// <summary>
+        /// Splats farther than this many times the clip's height from its centre are left out: they'd be far outside the room
+        /// at any size (something that flies kilometres away). Left in, they would spread each frame's 16-bit positions so thin
+        /// that everything else shimmers.
+        /// </summary>
+        const float FarAway = 10f;
+
+        static HologramFit FitOf(SplatCloud cloud)
+        {
+            float minY = float.MaxValue, maxY = float.MinValue;
+            for (var i = 0; i < cloud.Count; i++)
+            {
+                minY = Mathf.Min(minY, cloud.Positions[i * 3 + 1]);
+                maxY = Mathf.Max(maxY, cloud.Positions[i * 3 + 1]);
+            }
+
+            return HologramFrame.Fit(cloud.Positions, cloud.Count, minY, maxY, new int[256]);
+        }
+
+        /// <summary>
+        /// Run <paramref name="work"/> for every frame in parallel, as half the packing: progress goes from
+        /// <paramref name="start"/> to <paramref name="start"/> + 0.5.
+        /// </summary>
+        static void ForEachFrame(int count, float start, Func<float, bool> progress, Action<int> work)
+        {
+            var done = 0;
+            var cancelled = false;
+            var task = Task.Run(() => Parallel.For(0, count, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1) },
+                (i, state) =>
+                {
+                    if (Volatile.Read(ref cancelled))
+                    {
+                        state.Stop();
+                        return;
+                    }
+
+                    work(i);
+                    Interlocked.Increment(ref done);
+                }));
+            while (!task.IsCompleted)
+            {
+                if (progress != null && !progress(start + 0.5f * Volatile.Read(ref done) / count))
+                    Volatile.Write(ref cancelled, true);
+                Thread.Sleep(50);
+            }
+
+            if (task.IsFaulted)
+                throw task.Exception.GetBaseException();
+            if (cancelled)
+                throw new OperationCanceledException("Packing was cancelled.");
         }
 
         static SplatCloud Decode(string file, UpAxis up)
@@ -202,10 +261,13 @@ namespace ImmersiveX.Media.Editor
             return json.Append("]}]}").ToString();
         }
 
-        static float Median(IEnumerable<float> values)
+        /// <summary>The <paramref name="q"/> quantile, between the two nearest values (0.5 is the median).</summary>
+        static float Quantile(IEnumerable<float> values, float q)
         {
             var sorted = values.OrderBy(v => v).ToArray();
-            return sorted.Length % 2 == 1 ? sorted[sorted.Length / 2] : 0.5f * (sorted[sorted.Length / 2 - 1] + sorted[sorted.Length / 2]);
+            var at = q * (sorted.Length - 1);
+            var below = (int)Math.Floor(at);
+            return below + 1 < sorted.Length ? Mathf.Lerp(sorted[below], sorted[below + 1], at - below) : sorted[below];
         }
 
         static PlyContent PlyContentOf(string file)

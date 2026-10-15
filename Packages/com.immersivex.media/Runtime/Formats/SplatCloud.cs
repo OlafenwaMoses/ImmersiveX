@@ -93,7 +93,6 @@ namespace ImmersiveX.Media
             }
         }
 
-        /// <summary>A copy of only the <paramref name="keep"/> most visible splats (opacity × size), in their original order.</summary>
         /// <summary>
         /// Without the far background: splats more than three times the 90th-percentile distance from the centre, like an
         /// outdoor scan's sky shell. The capture then stands in the room like an object instead of being drawn as a bubble
@@ -121,13 +120,22 @@ namespace ImmersiveX.Media
             for (int i = 0, s = 0; i < Count; i += step, s++)
                 axis[s] = (new Vector3(Positions[i * 3], Positions[i * 3 + 1], Positions[i * 3 + 2]) - centre).sqrMagnitude;
             System.Array.Sort(axis);
-            var cutoff = 9f * axis[(int)(samples * 0.9f)]; // (3 × the 90th-percentile distance)², in squared units
+            return WithinSquared(centre, 9f * axis[(int)(samples * 0.9f)], out dropped); // (3 × the 90th-percentile distance)²
+        }
 
+        /// <summary>
+        /// Only the splats within <paramref name="radius"/> of <paramref name="centre"/>. Returns this cloud when none are
+        /// farther out.
+        /// </summary>
+        public SplatCloud Within(Vector3 centre, float radius, out int dropped) => WithinSquared(centre, radius * radius, out dropped);
+
+        SplatCloud WithinSquared(Vector3 centre, float squaredRadius, out int dropped)
+        {
             var keep = new bool[Count];
             var kept = 0;
             for (var i = 0; i < Count; i++)
             {
-                keep[i] = (new Vector3(Positions[i * 3], Positions[i * 3 + 1], Positions[i * 3 + 2]) - centre).sqrMagnitude <= cutoff;
+                keep[i] = (new Vector3(Positions[i * 3], Positions[i * 3 + 1], Positions[i * 3 + 2]) - centre).sqrMagnitude <= squaredRadius;
                 if (keep[i])
                     kept++;
             }
@@ -142,6 +150,7 @@ namespace ImmersiveX.Media
             return result;
         }
 
+        /// <summary>A copy of only the <paramref name="keep"/> most visible splats (opacity × size), in their original order.</summary>
         public SplatCloud Strongest(int keep)
         {
             if (keep <= 0 || keep >= Count)

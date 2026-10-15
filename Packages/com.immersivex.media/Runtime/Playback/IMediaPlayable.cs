@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ImmersiveX.Media
@@ -60,6 +61,9 @@ namespace ImmersiveX.Media
         /// <summary>Most Gaussians or points drawn at once; larger files keep the most visible ones.</summary>
         public int MaxGaussians = 400_000;
 
+        /// <summary>Content with several pieces (models, web scenes) gets selectable, movable parts (see <see cref="IMediaParts"/>).</summary>
+        public bool SelectableParts = true;
+
         public int ParallelDownloads = 24;
         public float BufferSeconds = 3f;
         public float PrerollSeconds = 1f;
@@ -119,5 +123,61 @@ namespace ImmersiveX.Media
 
         /// <summary>After everything moved: fit to size and sort for <paramref name="viewer"/>.</summary>
         void LateTick(Transform viewer);
+    }
+
+    /// <summary>
+    /// A player whose content has pieces the user can select (ray click) and pick up (a hand at it): see
+    /// <see cref="ContentParts"/>. While it has parts, hands pick up the parts and the handles move the whole.
+    /// </summary>
+    public interface IMediaParts
+    {
+        /// <summary>The parts, or null when the content is one piece (or parts are off).</summary>
+        ContentParts Parts { get; }
+    }
+
+    /// <summary>
+    /// A player whose content brings its own controls (a web page's player, on its own panel): Immersive Media shows none of
+    /// its own, and the content's controls drive it.
+    /// </summary>
+    public interface IMediaOwnControls
+    {
+        /// <summary>
+        /// Show or hide its own controls with the media: hidden until it's placed, while its anchor is lost, and while the
+        /// content menu shows something else. Hidden, it waits where it is; shown again, it carries on.
+        /// </summary>
+        void SetShown(bool shown);
+
+        /// <summary>Whether its own player is playing (its parts can't be moved then).</summary>
+        bool IsPlaying { get; }
+    }
+
+    /// <summary>One callout: a card about a part of the content, pointing at it.</summary>
+    public struct MediaCallout
+    {
+        public string Id;
+        public string Title;
+        public string Body;
+
+        /// <summary>A figure shown under the text (optional).</summary>
+        public string Stat;
+
+        /// <summary>0–1: it fades in and out.</summary>
+        public float Visibility;
+
+        /// <summary>The world point it points at.</summary>
+        public Vector3 Anchor;
+    }
+
+    /// <summary>
+    /// A player whose content brings captions and callouts (a narrated piece): Immersive Media shows the caption on its
+    /// controls and the callouts as cards in the room, each with a line to the part it explains.
+    /// </summary>
+    public interface IMediaAnnotations
+    {
+        /// <summary>The caption now, or null.</summary>
+        string Caption { get; }
+
+        /// <summary>The callouts showing now.</summary>
+        IReadOnlyList<MediaCallout> Callouts { get; }
     }
 }

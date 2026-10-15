@@ -15,6 +15,8 @@ namespace ImmersiveX.Media
         static Material _mesh;
         static Material _meshLit;
         static Material _photoTransparent;
+        static Material _mesh4D;
+        static Material _mesh4DPaint;
 
         /// <summary>Gaussian splats (holograms, splat files, point clouds).</summary>
         public static Material SplatMaterial => _splats != null ? _splats : _splats = Load("HologramSplats");
@@ -30,6 +32,12 @@ namespace ImmersiveX.Media
 
         /// <summary>Flat photos with transparency (PNG).</summary>
         public static Material PhotoTransparentMaterial => _photoTransparent != null ? _photoTransparent : _photoTransparent = Load("PhotoTransparent");
+
+        /// <summary>4D meshes: baked colours, posed per object (see Mesh4DPlayable).</summary>
+        public static Material Mesh4DMaterial => _mesh4D != null ? _mesh4D : _mesh4D = Load("Mesh4D");
+
+        /// <summary>Paints a 4D mesh's colour keyframes into its atlas.</summary>
+        public static Material Mesh4DPaintMaterial => _mesh4DPaint != null ? _mesh4DPaint : _mesh4DPaint = Load("Mesh4DPaint");
 
         static Material Load(string name)
         {
@@ -47,6 +55,8 @@ namespace ImmersiveX.Media
             _mesh = null;
             _meshLit = null;
             _photoTransparent = null;
+            _mesh4D = null;
+            _mesh4DPaint = null;
         }
     }
 }

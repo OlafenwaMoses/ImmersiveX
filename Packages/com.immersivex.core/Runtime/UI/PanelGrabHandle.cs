@@ -5,8 +5,9 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 namespace ImmersiveX
 {
     /// <summary>
-    /// Adds a grab bar under a world-space panel, like the bar under Quest's own windows. Grab the bar with a hand
-    /// or controller to move the panel; the panel's buttons stay pressable because only the bar can be grabbed.
+    /// Adds a grab bar under a world-space panel, like the bar under Quest's own windows. Grab the bar with the ray, or
+    /// with a hand or controller at it, to move the panel; the panel's buttons stay pressable because only the bar can be
+    /// grabbed.
     /// While held, the panel stays upright and turns to face the user.
     /// </summary>
     /// <remarks>Add it from code with <see cref="Attach"/>, or put it on a panel root and set its size in metres.</remarks>
@@ -79,6 +80,7 @@ namespace ImmersiveX
             _grab.throwOnDetach = false;
             _grab.trackRotation = false; // we keep it upright and facing the user instead
             _grab.useDynamicAttach = true;
+            PanelZoneFilter.Apply(_grab); // the bar is a control: the ray or a hand moves it, but a hand at the panel presses the panel
             _grab.hoverEntered.AddListener(_ => _barMaterial.color = Hover);
             _grab.hoverExited.AddListener(_ => _barMaterial.color = _grab.isSelected ? Hover : Idle);
             _grab.selectExited.AddListener(_ => _barMaterial.color = Idle);

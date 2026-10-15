@@ -25,8 +25,9 @@ namespace ImmersiveX.Editor
             Undo.SetCurrentGroupName("Make Immersive");
             if (target.GetComponentInChildren<Collider>() == null)
             {
-                Undo.AddComponent<BoxCollider>(target);
-                ColliderFitting.FitBox(target);
+                // On the body layer: hands grab it, the ray from a hand or controller passes through it (it only clicks).
+                var box = ColliderFitting.FitBody(target);
+                Undo.RegisterCreatedObjectUndo(box.gameObject, "Make Immersive");
             }
 
             var content = target.GetComponent<ImmersiveContent>();

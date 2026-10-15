@@ -38,7 +38,7 @@ namespace ImmersiveX.Platforms.MetaQuest
                         _player.Call("setAudioAttributes", attributes);
                 }
 
-                _player.Call("setDataSource", url);
+                SetDataSource(url);
                 _player.Call("setLooping", loop);
                 _player.Call("setOnPreparedListener", new PreparedListener(this));
                 _player.Call("setOnErrorListener", new ErrorListener(this));
@@ -48,6 +48,33 @@ namespace ImmersiveX.Platforms.MetaQuest
             {
                 _failed = true;
                 ImmersiveXLog.Warn($"Audio track couldn't start ({exception.Message}). The hologram plays without sound.");
+            }
+        }
+
+        /// <summary>
+        /// A web address or file path as it is. A track inside the app (StreamingAssets, a <c>jar:file://…!/assets/…</c> URL)
+        /// can't be opened by URL, so it plays from the APK through a file descriptor; the build stores sound files
+        /// uncompressed, which that needs.
+        /// </summary>
+        void SetDataSource(string url)
+        {
+            const string apkAssets = "!/assets/";
+            var inApk = url.StartsWith("jar:", StringComparison.OrdinalIgnoreCase) ? url.IndexOf(apkAssets, StringComparison.Ordinal) : -1;
+            if (inApk < 0)
+            {
+                _player.Call("setDataSource", url);
+                return;
+            }
+
+            var asset = Uri.UnescapeDataString(url.Substring(inApk + apkAssets.Length));
+            using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+            using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+            using (var assets = activity.Call<AndroidJavaObject>("getAssets"))
+            using (var file = assets.Call<AndroidJavaObject>("openFd", asset))
+            using (var descriptor = file.Call<AndroidJavaObject>("getFileDescriptor"))
+            {
+                _player.Call("setDataSource", descriptor, file.Call<long>("getStartOffset"), file.Call<long>("getLength"));
+                file.Call("close"); // MediaPlayer keeps its own copy of the descriptor
             }
         }
 

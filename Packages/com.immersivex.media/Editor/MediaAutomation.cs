@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using ImmersiveX.Editor;
@@ -11,7 +12,9 @@ namespace ImmersiveX.Media.Editor
     /// Automation commands for ImmersiveX Media (see <see cref="EditorAutomation"/>):
     /// <list type="bullet">
     /// <item>In Play mode: <c>media status|play|pause|toggle|seek &lt;s&gt;|mute|unmute|speaker|volume &lt;0-1&gt;|turn &lt;deg&gt;|move &lt;x&gt; &lt;z&gt;|height &lt;m&gt;|open &lt;source&gt; [format]</c>
-    /// (<c>hologram</c> is the same command).</item>
+    /// (<c>hologram</c> is the same command). Web pages: <c>media inspect</c> (the mirrored scene), <c>media node &lt;name&gt;</c> (where its
+    /// objects with that name are), <c>media click &lt;x&gt; &lt;y&gt;</c> (press on the page's panel, in page pixels) and <c>media js &lt;code&gt;</c>
+    /// (run JavaScript in the page; what it returns is logged).</item>
     /// <item>In Edit mode: <c>media add [fps] &lt;file, folder or URL&gt;</c> (Add Media), <c>media pack [fps] [title=Name] &lt;folder&gt;</c>
     /// (pack splat frames into StreamingAssets without touching the scene) and <c>media check</c> (the build's content check).</item>
     /// <item><c>demo</c>: build the 3.5D Xperience demo scene.</item>
@@ -28,11 +31,61 @@ namespace ImmersiveX.Media.Editor
                 EditorAutomation.Report(command, DemoScenes.TryCreateXperience() ? "ok" : "retry", "See the Console for details."));
         }
 
-        /// <summary>"media add [fps] &lt;source&gt;" and "media check".</summary>
+        /// <summary>"media add [fps] &lt;source&gt;", "media check", "media scene", "media remove &lt;name&gt;" and "media first &lt;name&gt;".</summary>
         static void RunInEditMode(string command, string argument, string[] parts)
         {
             if (EditorApplication.isPlaying)
                 throw new InvalidOperationException("Stop Play mode first ('stop').");
+            if (parts[0] == "scene")
+            {
+                // the open scene's media, as saved: name, source, height
+                var lines = new System.Text.StringBuilder();
+                foreach (var m in UnityEngine.Object.FindObjectsByType<ImmersiveMedia>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID))
+                {
+                    var so = new SerializedObject(m);
+                    lines.AppendLine($"{m.name} · {so.FindProperty("_source").stringValue} · height {so.FindProperty("_height").floatValue:0.##} m · {(m.gameObject.activeInHierarchy ? "active" : "inactive")}");
+                }
+
+                EditorAutomation.Report(command, "ok", lines.Length > 0 ? lines.ToString() : "No Immersive Media in the open scene.");
+                return;
+            }
+
+            if (parts[0] == "remove")
+            {
+                // "media remove <name>": delete the Immersive Media objects with this name (or starting with it) and save
+                var name = argument.Substring(argument.IndexOf("remove", StringComparison.Ordinal) + 6).Trim().Trim('"');
+                if (name.Length == 0)
+                    throw new ArgumentException("'media remove' needs a name.");
+                var removed = new List<string>();
+                foreach (var m in UnityEngine.Object.FindObjectsByType<ImmersiveMedia>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID))
+                {
+                    if (!m.name.StartsWith(name, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    removed.Add(m.name);
+                    var scene = m.gameObject.scene;
+                    Undo.DestroyObjectImmediate(m.gameObject);
+                    UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
+                    UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+                }
+
+                EditorAutomation.Report(command, removed.Count > 0 ? "ok" : "error", removed.Count > 0 ? $"Removed {string.Join(", ", removed)} and saved the scene." : $"No Immersive Media named '{name}'.");
+                return;
+            }
+
+            if (parts[0] == "first")
+            {
+                // "media first <name>": put this Immersive Media first in the scene, so it leads the content menu
+                var name = argument.Substring(argument.IndexOf("first", StringComparison.Ordinal) + 5).Trim().Trim('"');
+                var first = Array.Find(UnityEngine.Object.FindObjectsByType<ImmersiveMedia>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID),
+                    m => string.Equals(m.name, name, StringComparison.OrdinalIgnoreCase)) ?? throw new ArgumentException($"No Immersive Media named '{name}'.");
+                Undo.SetTransformParent(first.transform, first.transform.parent, "Move media");
+                first.transform.SetSiblingIndex(0);
+                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(first.gameObject.scene);
+                UnityEditor.SceneManagement.EditorSceneManager.SaveScene(first.gameObject.scene);
+                EditorAutomation.Report(command, "ok", $"'{first.name}' is first in {first.gameObject.scene.name} now (saved).");
+                return;
+            }
+
             if (parts[0] == "check")
             {
                 var problems = MediaBuildCheck.Run(out var summary);
@@ -49,7 +102,13 @@ namespace ImmersiveX.Media.Editor
                 rest = rest.Substring(space + 1).Trim();
             }
 
-            if (rest.StartsWith("title=", StringComparison.Ordinal))
+            if (rest.StartsWith("title=\"", StringComparison.Ordinal) && rest.IndexOf('"', 7) > 7)
+            {
+                var end = rest.IndexOf('"', 7); // title="My clip"
+                options.Title = rest.Substring(7, end - 7);
+                rest = rest.Substring(end + 1).Trim();
+            }
+            else if (rest.StartsWith("title=", StringComparison.Ordinal))
             {
                 space = rest.IndexOf(' ');
                 options.Title = rest.Substring(6, (space > 0 ? space : rest.Length) - 6);
@@ -68,7 +127,8 @@ namespace ImmersiveX.Media.Editor
                 var result = SplatSequencePacker.Pack(frames, output, options.FrameRate, UpAxis.Auto, 0, title);
                 AssetDatabase.Refresh();
                 EditorAutomation.Report(command, "ok", $"Packed {result.Frames} frames in {watch.Elapsed.TotalSeconds:0.0} s → {result.Manifest}: {result.MaxGaussians:N0} Gaussians at most, " +
-                                                       $"{result.Bytes / 1e6:0} MB, {result.MegabytesPerSecond:0.#} MB/s, fit {result.Fit.Height:0.00} tall.");
+                                                       $"{result.Bytes / 1e6:0} MB, {result.MegabytesPerSecond:0.#} MB/s, fit {result.Fit.Height:0.00} tall, " +
+                                                       $"{result.LeftOut:N0} far splats left out (in {result.FramesLeftOutOf} frames).");
                 return;
             }
 
@@ -82,7 +142,7 @@ namespace ImmersiveX.Media.Editor
         static void Run(string command, string argument)
         {
             var parts = argument.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 0 && (parts[0] == "add" || parts[0] == "pack" || parts[0] == "check"))
+            if (parts.Length > 0 && (parts[0] == "add" || parts[0] == "pack" || parts[0] == "check" || parts[0] == "scene" || parts[0] == "remove" || parts[0] == "first"))
             {
                 RunInEditMode(command, argument, parts);
                 return;
@@ -147,6 +207,32 @@ namespace ImmersiveX.Media.Editor
                 case "turn": media.Turn(Number(1)); media.SavePlacement(); break; // as if the user let go of it
                 case "move": media.MoveBy(new Vector3(Number(1), 0f, Number(2))); media.SavePlacement(); break;
                 case "height": media.Height = Number(1); media.SavePlacement(); break;
+                case "parts": // a web page's parts: their colliders and how near they come to the user's reach to the panel
+                    EditorAutomation.Report(command, "ok", media.Playable is WebPlayable withParts
+                        ? withParts.DescribeParts(Camera.main != null ? Camera.main.transform : null) : "Not a web page.");
+                    return;
+                case "refit": // place a web page's scene again as it stands now (diagnostics)
+                    EditorAutomation.Report(command, "ok", media.Playable is WebPlayable placed ? placed.Refit() : "Not a web page.");
+                    return;
+                case "inspect":
+                    EditorAutomation.Report(command, "ok", media.Playable is WebPlayable web ? web.Inspect() : media.DescribeStatus());
+                    return;
+                case "node": // where the web page's mirrored objects with this name are
+                    if (!(media.Playable is WebPlayable mirrored) || parts.Length < 2)
+                        throw new ArgumentException("Usage: media @<n> node <name>  (web pages)");
+                    var camera = Camera.main != null ? $" · camera at {Camera.main.transform.position:F2} looking {Camera.main.transform.forward:F2}" : string.Empty;
+                    EditorAutomation.Report(command, "ok", mirrored.InspectNode(parts[1]) + camera);
+                    return;
+                case "js": // run JavaScript in its web page; the result is logged ("Web page: eval: …")
+                    if (!(media.Playable is WebPlayable scripted))
+                        throw new ArgumentException("'media js' is for web pages.");
+                    scripted.Script(argument.Substring(argument.IndexOf("js", StringComparison.Ordinal) + 2).Trim());
+                    break;
+                case "click": // press and release on its web page's panel at page pixels x y (top left origin)
+                    if (!(media.Playable is WebPlayable page))
+                        throw new ArgumentException("'media click' is for web pages.");
+                    page.Click(new Vector2(Number(1), Number(2)));
+                    break;
                 case "open":
                     if (parts.Length < 2)
                         throw new ArgumentException("Usage: media open <source> [format]  (quote a source with spaces)");

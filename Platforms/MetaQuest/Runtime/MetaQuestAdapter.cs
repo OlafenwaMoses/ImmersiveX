@@ -49,7 +49,10 @@ namespace ImmersiveX.Platforms.MetaQuest
             Services.Register<ISpaceProvider>(new MetaQuestSpace());
             Services.Register<IBoundaryProvider>(new MetaQuestBoundary());
             if (Application.platform == RuntimePlatform.Android) // in the editor (Meta XR Simulator) Unity's VideoPlayer plays audio
+            {
                 Services.Register<IStreamAudioProvider>(new AndroidStreamAudioProvider());
+                Services.Register<IDeviceMenuProvider>(new MetaQuestDeviceMenu());
+            }
         }
 
         static bool IsMetaRuntime(string runtimeName) =>

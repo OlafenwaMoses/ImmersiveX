@@ -120,7 +120,11 @@ namespace ImmersiveX.Media
             _surface = Projection.BuildScreen(_context.Root, _material, width, height, _context.ScreenHeight, out _mesh, out _bounds);
         }
 
-        void BuildSphere() => _surface = Projection.BuildSphere(_texture, _coverage, _layout, out _mesh, out _material, out _bounds);
+        void BuildSphere()
+        {
+            _surface = Projection.BuildSphere(_texture, _coverage, _layout, out _mesh, out _material, out _bounds);
+            _surface.transform.SetParent(_context.Root, true); // hidden with the media; it still follows the viewer's head
+        }
 
         public void Play()
         {

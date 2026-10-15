@@ -138,6 +138,13 @@ namespace ImmersiveX.Media.Editor
             if (Directory.Exists(path))
             {
                 var inFolder = new[] { "stream.json", "sequence.json" }.Select(f => Path.Combine(path, f)).FirstOrDefault(File.Exists);
+                if (inFolder == null && File.Exists(Path.Combine(path, "index.html")))
+                    return null; // a web page's folder
+                var container = inFolder == null ? Directory.GetFiles(path).FirstOrDefault(f => Mesh4DContainer.IsContainerName(f)) : null;
+                if (container != null && container.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
+                    return GzName(source, container);
+                if (container != null)
+                    return Check4DMesh(container, source);
                 if (inFolder == null)
                 {
                     try
@@ -156,6 +163,10 @@ namespace ImmersiveX.Media.Editor
 
             if (!File.Exists(path))
                 return $"'{source}' isn't in StreamingAssets.";
+            if (path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
+                return GzName(source, path);
+            if (Mesh4DContainer.IsContainerName(path))
+                return Check4DMesh(path, source);
             if (Path.GetExtension(path).ToLowerInvariant() != ".json")
                 return null;
 
@@ -178,6 +189,41 @@ namespace ImmersiveX.Media.Editor
             catch (FormatException exception)
             {
                 return $"'{source}' can't be read ({exception.Message}).";
+            }
+        }
+
+        /// <summary>Android's packaging decompresses .gz assets and drops the extension: the app would look for a file that isn't there.</summary>
+        static string GzName(string source, string file) =>
+            $"'{source}': {Path.GetFileName(file)} ends in .gz, which Android's packaging decompresses and renames, so the app can't find it. " +
+            (Mesh4DContainer.IsContainerName(file) ? "Rename it to .sp4m (gzipped inside is fine), or add it again with Add Media." : "Give it its plain name.");
+
+        /// <summary>A 4D mesh container: readable, and the soundtrack its header names is next to it.</summary>
+        static string Check4DMesh(string file, string source)
+        {
+            try
+            {
+                bool gzipped;
+                using (var peek = File.OpenRead(file))
+                    gzipped = peek.ReadByte() == 0x1f && peek.ReadByte() == 0x8b; // gzipped inside, whatever the name
+                using (var stream = File.OpenRead(file))
+                using (var input = gzipped ? (Stream)new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Decompress) : stream)
+                using (var reader = new BinaryReader(input))
+                {
+                    var magic = new string(reader.ReadChars(4));
+                    if (magic != "SP4M")
+                        return $"'{source}': {Path.GetFileName(file)} isn't a 4D mesh container.";
+                    reader.ReadInt32();
+                    var header = System.Text.Encoding.UTF8.GetString(reader.ReadBytes(reader.ReadInt32()));
+                    if (Json.Parse(header) is Dictionary<string, object> h && h.TryGetValue("audio", out var audio) && audio is string name && name.Length > 0 &&
+                        !File.Exists(Path.Combine(Path.GetDirectoryName(file) ?? ".", name)))
+                        return $"'{source}': its soundtrack '{name}' isn't next to {Path.GetFileName(file)}.";
+                }
+
+                return null;
+            }
+            catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is FormatException)
+            {
+                return $"'{source}': {Path.GetFileName(file)} can't be read ({exception.Message}).";
             }
         }
 
