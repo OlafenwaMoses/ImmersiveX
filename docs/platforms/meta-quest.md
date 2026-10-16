@@ -21,12 +21,12 @@
 ## Set up and build
 1. **ImmersiveX ▸ Platform Setup ▸ Meta Quest ▸ Install.** Wait for the Package Manager and compilation to finish.
 2. **Configure.** This sets:
-   - **Player:** IL2CPP, ARM64, Vulkan only, Android API 32 minimum / 34 target, ASTC textures.
+   - **Player:** IL2CPP, ARM64, Vulkan only, Android API 32 minimum / 34 target, ASTC textures, install location *auto*, landscape orientation.
    - **XR:** the OpenXR loader for Android, and the **Meta Quest feature set**, enabled the way the Project Settings checkbox does it. That also turns on its required **Composition Layers Support**; without it passthrough never draws and you see black. Enabled Meta Quest features: Session, Camera (Passthrough), Planes, Bounding Boxes, Anchors, Raycasts and Boundary Visibility. ImmersiveX hides the boundary once passthrough is showing, because the feature's own start-up request fails with `XR_ERROR_HANDLE_INVALID`.
    - **Input:** Hand Tracking, Meta Hand Tracking Aim, and the Oculus Touch, Quest Touch Plus and Hand Interaction profiles. Latency optimisation is set to *Prioritize Input Polling*.
    - **URP:** HDR, terrain holes and post-processing off; intermediate texture set to *Auto*, which passthrough needs.
    - **Rig samples:** imports the XR Interaction Toolkit rig samples if they're missing.
-3. **Build.** The APK is written to `Builds/metaquest/ImmersiveX.apk`. Building never installs anything.
+3. **Build.** The APK is written to `Builds/metaquest/ImmersiveX.apk`. Every build also gets the Meta Horizon Store manifest rules (see [Publishing](#publishing-to-the-meta-horizon-store)). Building never installs anything.
 
 Command line (with the editor closed):
 
@@ -70,7 +70,7 @@ Everything marked ❌ is checked on the headset.
 ## What happens on first launch
 1. Quest asks for permission to use **spatial data** (`USE_SCENE`). Allow it, or room data stays unavailable.
 2. Passthrough comes on and the boundary is hidden.
-3. Once the headset is on and tracking, the **Hello Hologram** cube appears about 80 cm in front of you, with the **Device check** panel on your left.
+3. Once the headset is on and tracking, the first scene in the build opens. In this repository that's the demo scene (**ImmersiveX ▸ Demos**): its content stands at the room's centre and the content menu opens with a swipe. `Main.unity`, the starter scene, has the **Hello Hologram** cube about 80 cm in front of you and the **Device check** panel on your left; put it first in **File ▸ Build Profiles** to open it instead.
 
 ## Room mapping (M2)
 - **Room Quest already knows** (Space Setup done): ImmersiveX saves it automatically on first launch. A short "Room saved" note appears, and the walkable area is outlined on the floor for 6 s.
@@ -93,6 +93,8 @@ Everything marked ❌ is checked on the headset.
 - **Splat budget:** big splat scenes keep their 400,000 most visible splats on the headset. Set **Max Gaussians** to change that.
 
 ## Device checklist
+The passthrough, controller, Space Setup and anchor checks use the cube and the **Device check** panel in `Main.unity`; put it first in the build for them. The media checks use the demo scene or your own.
+
 | Check | How | Expected |
 |---|---|---|
 | Passthrough | Look around | The real room is visible behind the cube |

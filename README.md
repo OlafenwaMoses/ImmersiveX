@@ -105,6 +105,7 @@ If settings ever drift, run **ImmersiveX ▸ Maintenance ▸ Apply Project Basel
 2. Add content:
    - **Media** (splats, 4D captures, models, video, photos, web pages, 4D meshes): **ImmersiveX ▸ Media ▸ Add Media…**, then save the scene.
    - **Your own Unity objects:** put them in `Assets/Content/`, drag them into `Assets/Scenes/Main.unity`, then right-click each one ▸ **ImmersiveX ▸ Make Immersive**. (New scenes: **ImmersiveX ▸ New Scene**.)
+   - **Where it stands and how it plays** (order in the menu, Placement, Height, Up, Play On Start): see [Placing content in the app](CONTENT_GUIDE.md#placing-content-in-the-app). Web experiences are best added by an AI coding agent that tests them in the simulator ([section 12](CONTENT_GUIDE.md#adding-a-web-experience-with-an-ai-coding-agent-recommended)).
 3. Try it without a headset:
    - **ImmersiveX ▸ Play Mode ▸ Meta XR Simulator (Quest)** or **XR Simulation (any device)**
    - then press **Play**.

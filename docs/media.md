@@ -68,7 +68,9 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
 
 ## Where it stands
 - **The first media in the scene hierarchy** stands at the **centre of the mapped room**; the others stand around it. With no mapped room, as in the editor simulators, the group centres 2 m in front of the user.
+  - **Placement:** *Room Centre* (default) or *In Front Of User*, at **Distance From User** (2 m).
   - Set **Spot** to choose: 0 is the centre and 1 and up stand around it.
+  - **With the content menu on** (the default), one piece shows at a time, and the menu lists them in hierarchy order. See [CONTENT_GUIDE.md](../CONTENT_GUIDE.md#placing-content-in-the-app) for placing each kind of content.
 - **Standing media** is fitted to **Height** (1.60 m by default) with its feet on the floor, facing the user. Add Media sets Height to a packed capture's real size.
 - **Hologram streams** are fitted frame by frame and jump at camera cuts. A stream with a `fit` in its `stream.json` keeps that one fit for the whole clip, so a character keeps its size when it raises an arm.
 - **Sequences** keep the first frame's scale, so a performer can move.

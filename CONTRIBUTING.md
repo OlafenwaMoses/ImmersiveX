@@ -5,7 +5,7 @@ Thanks for helping. This guide covers setting up the project, the rules every ch
 ## Simplicity rules
 ImmersiveX has to stay easy to start, work with, fork and understand. Every pull request is reviewed against these rules:
 
-1. **One component to learn.** Users should only need `ImmersiveContent`. Everything else is optional.
+1. **One component per job.** Users need `ImmersiveContent` for their own Unity objects and `ImmersiveMedia` for media; nothing else is required. Everything else is optional.
 2. **Safe defaults.** Features work with no setup: transparent, floating, grabbable and remembered where placed.
 3. **Presets before parameters.** Add a `ContentProfile` preset before adding another inspector field.
 4. **No platform code in core.** No vendor SDK types or calls, and no `#if UNITY_ANDROID`-style branches, in `Packages/com.immersivex.core`. Device specifics live in `Platforms/<Name>`.

@@ -2,7 +2,7 @@
 
 Every kind of content ImmersiveX plays, and the shape it must be in so it goes into the app and plays with no code and no further changes to the content. If content follows the structure here, you add it in the Unity editor and build; the build tells you if anything is missing.
 
-Everything below was tested on 2026-09-28 with 88 real files downloaded from public sources, in the Unity editor and in the Meta XR Simulator (Quest 3). Hologram streams, 4D Gaussian splats and 4D meshes have also played on a Quest 3; the other types in this guide still need a headset check. The [test results](#tested-with) are at the end.
+Everything below was tested from 2026-09-28 to 2026-10-15 with real files from public sources, in the Unity editor and in the Meta XR Simulator (Quest 3). Hologram streams, 4D Gaussian splats and 4D meshes have also played on a Quest 3; the other types in this guide still need a headset check. The [test results](#tested-with) are at the end.
 
 ## Adding content
 
@@ -20,6 +20,23 @@ Everything below was tested on 2026-09-28 with 88 real files downloaded from pub
 - **The app gets bigger by the size of its content.** The APK is about 60 MB plus the content, and a 4D capture can add several hundred MB.
 - **In this repository `ImmersiveXContent/` is git-ignored,** so content isn't committed. After a fresh clone, add the content again; the build check reminds you.
 - **Licences:** make sure you're allowed to ship it. Many free models and captures are non-commercial (CC BY-NC).
+
+## Placing content in the app
+
+Every kind of content is placed the same way. Each section below adds what's specific to that kind under **Placing it**.
+
+1. **Add it to a scene in the build.** Media goes in as **Immersive Media** (Add Media, or the component by hand); your own Unity objects go in with **Make Immersive** (section 10). The first scene in **File ▸ Build Profiles** is the one the app opens. Save the scene.
+2. **Put it in order.** The content menu lists the scene's content in hierarchy order, top first: drag objects in the Hierarchy to reorder them (automation: `media first <name>`). With the menu on, one piece shows at a time: the first, until the user picks another (the app remembers the choice).
+3. **Choose where it first stands** (Immersive Media ▸ *Size and placement*):
+   - **Placement:** *Room Centre* (default): the centre of the mapped room, or in front of the user when no room is mapped. *In Front Of User*: **Distance From User** ahead (2 m by default).
+   - **Height:** how tall standing content is, in metres (1.6 by default); its width follows. Flat video and photos use **Screen Height** (1 m) instead, and 360°/180° media surrounds the user.
+   - **Up:** which way is up in the file, when it differs from the format's convention.
+   - **Spot:** only when several pieces show at once (content menu off): 0 is the centre and 1 and up stand around it; −1 follows the hierarchy order.
+   - Standing content stands on the floor and faces the user.
+4. **Choose how it plays** (*Playback*): **Play On Start** (off: it waits, paused, for Play), **Loop**, **Volume**, and **Frame Rate** for frame folders.
+5. **Choose what the user can do:** **Show Controls**, **Show Handles** and **Selectable Parts**.
+6. **Then the user places it.** It's anchored where it first stands. The user moves, turns and resizes it with its handles, or a hand, and it stays there through headset off/on and relaunches, held by a spatial anchor. Nothing moves it by itself after that.
+7. **Test it** in the Meta XR Simulator (**ImmersiveX ▸ Play Mode ▸ Meta XR Simulator (Quest)**, then Play): pick it from the content menu, play it, move it. Then build; the build's content check stops if anything is missing.
 
 ## At a glance
 
@@ -96,6 +113,8 @@ Static 3D captures made with Gaussian splatting (Polycam, Luma, Scaniverse, Post
   - `.spz` is the smallest format, about a tenth of a 3DGS `.ply`.
 - **Colour:** view-dependent colour (spherical harmonics beyond the base colour) isn't drawn.
 
+**Placing it:** Add Media with the file. It stands on the floor at **Height** whatever the capture's own size (a room scan becomes a diorama the user can enlarge up to 4 m with the resize corner). Set **Up** if it shows upside down or on its side, and **Max Gaussians** to trade detail for frame rate. A splat file is a still: Play is greyed out.
+
 **Won't play:** PlayCanvas `.sog` and splats inside glTF (`KHR_gaussian_splatting`, which loads as plain points). Export `.ply`, compressed `.ply` or `.spz` from SuperSplat instead.
 
 ## 2. 4D Gaussian splats
@@ -125,6 +144,8 @@ MyCapture/
 - **Sets Height to the capture's real size** when that's between 0.2 and 4 m; a bigger scene keeps the default 1.6 m.
 - **Uses the folder's sound file** as the soundtrack. It's the clock, and it plays on the headset from inside the app (silent in the editor, which can't decode `.m4a`).
 
+**Placing it:** Add Media with the folder; it asks for the frame rate and the most Gaussians a frame. The packed clip keeps its real size (Height is set from it when it's between 0.2 and 4 m) and stands on the ground the clip comes down to. Its soundtrack is the clock, so **Play On Start** and **Loop** work as for video.
+
 **Budget:** 100,000 Gaussians per frame × 164 frames at 30 fps is 267 MB, read at 51 MB/s, and plays on a Quest 3; 30,000 per frame × 751 frames at 6 fps is 369 MB, read at 3 MB/s. Use **Max Gaussians a frame** to shrink bigger captures, and keep clips short, since every second at that density adds about 50 MB to the app.
 
 **Won't play:** splaTV `.splatv`, and other single-file 4D formats with per-Gaussian motion. Export per-frame `.ply` files and pack them.
@@ -142,12 +163,15 @@ GenXR 3.5D streams, or a stream you packed.
   ```
   Point the Source at `stream.json` or at the folder.
 
+**Placing it:** Add Media with the URL or the folder. It stands on the floor at **Height**. A stream with a `fit` in its `stream.json` keeps that one fit for the whole clip; otherwise it's fitted frame by frame and jumps at camera cuts. **Quality** picks the tier, and **Buffer Seconds** and **Preroll Seconds** tune streaming on slower Wi-Fi.
+
 ## 4. Point clouds
 Scans stored as coloured points.
 
 - **Bring a `.ply`** with `x y z` and optional colour (`red green blue`, as 0–255 or 0–1). Normals and extra elements are ignored. It must have no faces; a PLY with faces is read as a mesh.
 - **Orientation:** read as y-up. Many LiDAR and CAD clouds are z-up (set **Up** to +Z). Camera-frame scans are y-down (set −Y).
 - **How it shows:** each point is drawn as a small round splat sized from the point spacing, fitted to Height. A scene's far outliers are left out.
+- **Placing it:** Add Media with the file. **Height** and **Up** as above; **Max Gaussians** caps how many points are drawn.
 - **Won't play:** `.las`, `.laz`, `.e57`, `.pcd`, `.xyz`. Convert them to PLY, for example with CloudCompare (File ▸ Save as ▸ PLY).
 
 ## 5. Volumetric video and frame sequences
@@ -175,6 +199,8 @@ Performance/
 ```
 Paths are relative to the JSON; `up` is `+y`, `-y`, `+z` or `-z`.
 
+**Placing it:** Add Media with the folder or the sequence file, and set **Frame Rate**. **Height** fits the first frame, and that scale is kept, so a performer can walk around. A sound file in the folder (or `audio` in the JSON) is the clock.
+
 **Won't play:** vendor formats (section 11), and sequences of `.glb` frames. Export OBJ or PLY frames instead.
 
 ## 6. 3D models (glTF and GLB)
@@ -189,6 +215,7 @@ The standard format for 3D models on the web (Sketchfab, Poly Haven, Khronos, mo
   - Compressed meshes (Draco, `EXT_meshopt_compression`, quantisation) and KTX2 / Basis Universal textures.
 - **Size:** fitted to Height whatever its units: a 79-unit Fox and a 6 cm avocado both stand 1.6 m tall. Up is +Y, as glTF defines it.
 - **Budget:** game-ready models play smoothly (tested up to 71 meshes with an animation). For the headset, prefer GLB with KTX2 textures and textures of 2K or less.
+- **Placing it:** Add Media with the `.glb`, or the folder holding the `.gltf`. It's fitted to **Height** and lit. **Selectable Parts** is on, so a model with two or more meshes has parts the user can pick up and put back. The first animation is what Play plays; a model without one is a still.
 - **Won't play:**
   - `EXT_texture_webp`: re-export with PNG, JPG or KTX2.
   - `KHR_meshopt_compression`: the new Khronos name; export with `EXT_meshopt_compression` or Draco.
@@ -204,6 +231,7 @@ Scans, photogrammetry and simple models.
 
 - **How it shows:** textured and vertex-coloured meshes draw **unlit**, so a scan keeps its captured lighting. Plain colours, or no colour at all (STL), draw **lit**, so the shape shows. Fitted to Height.
 - **Orientation:** OBJ and PLY are read as y-up, STL as z-up. Set **Up** for a mesh that differs (many PLY scans are z-up).
+- **Placing it:** Add Media with the main file; its companions come with it. Set **Height** and **Up**. A mesh is a still: Play is greyed out.
 - **Won't play:** FBX, Blend, USDZ, DAE, 3DS (section 10), and big-endian PLY.
 
 ## 8. Video
@@ -235,6 +263,7 @@ Scans, photogrammetry and simple models.
 - **Spherical metadata inside the file isn't read,** so the name, the shape or the settings decide.
 - **How it shows:** flat video is an upright screen of **Screen Height** (1 m by default). 360° and 180° video surrounds you, facing where you looked when it opened.
 - **Resolution:** 2048×2048 stereo was tested. 4K is the safe choice for the headset; check higher resolutions on it.
+- **Placing it:** Add Media with the file or a direct HTTPS link. A flat video is an upright screen of **Screen Height**, placed like any other content. A 360° or 180° video surrounds the user instead, facing where they looked when it opened, with its controls in front of them. Set **Format** and **Stereo** when detection can't tell; **Play On Start**, **Loop** and **Volume** as usual.
 - **Won't play:**
   - Cubemap or EAC 360° video, and fisheye or mesh-projected VR180 straight from some cameras (`ytmp`): convert them to equirectangular.
   - Flat side-by-side 3D films play as the full frame.
@@ -245,6 +274,7 @@ Scans, photogrammetry and simple models.
 - **Kinds:** the same as video: flat, 360° or 180°, mono or top-bottom/side-by-side stereo, detected the same way. A 2:1 photo is a 360° panorama; phone photospheres are 2:1. File names with any characters work: spaces, commas and Cyrillic were tested.
 - **Size:** 4608×2304 and 4096×4096 were tested. Stay at or below 8192×4096 for the headset.
 - **Before adding:** photos show as stored, and EXIF rotation isn't applied. Rotate them first if your viewer relies on it.
+- **Placing it:** as for video (Add Media; **Screen Height** for a flat photo, a sphere around the user for 360°/180°). A photo is a still: Play is greyed out.
 - **Won't play:** HEIC (including Apple Vision Pro spatial photos), WebP, AVIF, HDR, EXR, TIFF, BMP and GIF. Convert them to JPG or PNG.
   - A Google VR180 `.vr.jpg` shows only its left eye, because the right eye is hidden in its metadata.
 
@@ -255,12 +285,18 @@ These formats can't load while the app runs, but Unity imports them in the edito
 2. Drag it into the scene.
 3. Right-click it ▸ **ImmersiveX ▸ Make Immersive.** It becomes grabbable with hands and controllers, floats where it's released and is held by a spatial anchor. Its animations play through its Animator.
 
+**Placing it** (the **Immersive Content** component Make Immersive adds):
+- **Placement:** *In Front Of User* (default) puts it at **Offset From User** the first time: 0.8 m ahead and 15 cm below the eyes. *Keep Scene Position* starts it where it is in the scene.
+- Then the user moves it, and it stays where they leave it, held by a spatial anchor (its size too).
+- It gets the handles and is listed in the content menu like media. **Selectable Parts** is off for Unity objects: turn it on when the object's meshes should be parts.
+
 To get Immersive Media's playback controls instead, export the model as GLB (for example from Blender) and add that.
 
 ## 11. Vendor volumetric formats
 - **4DViews (`.4ds`), Arcturus HoloSuite (`.oms`) and Volograms (`.vols`)** are closed formats that only their own SDKs decode.
 - **Playing them takes a small adapter** (an `IMediaCodec`) around the vendor's SDK. It then gets the same controls, handles and anchors.
 - **Without one,** export the capture as an OBJ or PLY frame sequence (section 5) where the vendor's tools allow it.
+- **Placing it:** with an adapter, it's placed like any Immersive Media.
 
 ## 12. Web experiences (three.js pages)
 Interactive 3D web pages made with three.js, such as GenXR pipeline experiences.
@@ -287,6 +323,33 @@ Interactive 3D web pages made with three.js, such as GenXR pipeline experiences.
   - points and sprites;
   - the page's own "Enter VR/AR" button (ImmersiveX is the XR here).
 - **On the headset** the page runs in Android's WebView. Local pages work offline.
+- **Placing it:** Add Media with the `.html`, the folder or the URL. The rule above decides where its scene stands relative to the content's place, and **Height** sets how tall it is. Its panel appears to the user's left. **Selectable Parts** turns its actors (or top-level things) into parts.
+
+### Adding a web experience with an AI coding agent (recommended)
+Web pages differ far more than files of one format do: how they load, what their ground is, how they draw and what their buttons do. So the best way to bring one in is to have an **AI coding agent** (such as Claude Code) add it and test it in the open editor, then adjust the page or its settings until it fits. The agent drives the editor through `EditorAutomation` (see [CONTRIBUTING](CONTRIBUTING.md#driving-the-open-editor-automation)): it adds the page, plays it in the Meta XR Simulator, looks at what the headset would show, presses the page's buttons, and reads the log.
+
+**What to ask the agent** (adapt the paths and names):
+> Add the web experience at `<file, folder or URL>` to the scene `<scene>` with Add Media, titled `<title>`. Test it in the Meta XR Simulator through the content menu: select it from the menu and start it from its own panel. Check that:
+> - its scene stands on the floor at the content's place;
+> - what moves on the page moves in the room;
+> - its panel's buttons and captions work;
+> - its parts can be selected, picked up and put back;
+> - it pauses and resumes when the menu shows something else.
+>
+> Use the screenshots and the log. Fix what doesn't fit, in the page where you can, otherwise in the Immersive Media settings, and test again. Then run the build's content check and build the APK. Don't install it on a headset unless I ask.
+
+**What the agent works with:**
+- Edit mode: `media add [title=Name] <file, folder or URL>`, `media scene`, `media check`, `build metaquest`.
+- Play mode: `playmode metaquest-simulator`, `play 0`, `contentmenu select <n>`, `capture`, `stop`, and the play log.
+- The page itself: `media @<n> inspect` (the mirrored scene), `media @<n> node <name>` (where its objects with that name are), `media @<n> click <x> <y>` (press on its panel), `media @<n> js <code>` (run JavaScript in the page), `media @<n> parts`.
+
+**What makes a page fit best** (what the agent checks for, or adds to the page):
+- **It says when it's ready:** `window.__ready = true` once its scene is built and at its first moment, so it's placed then. Without it, ImmersiveX waits for the load event plus 2 s of stillness (20 s at most).
+- **A real ground:** a wide flat mesh the scene stands on becomes the room's floor.
+- **Standard three.js materials and transforms** for anything that moves or matters: custom shaders are drawn in their main colour, and motion done inside a shader doesn't reach the room.
+- **Named parts:** a page that exposes a player with actors (`window.__player.actors`, each with a `root` object and an `info.title`, as GenXR pipeline pages do) gets those as titled parts; otherwise its top-level objects are the parts.
+- **Its own controls in the page's HTML,** which show on the panel. It needs no "Enter VR/AR" button.
+- **Self-contained, with relative paths,** on three.js's WebGLRenderer (r170 or later).
 
 ## 13. 4D meshes (.sp4m)
 A scene baked over time: the scene's own triangles part by part, every part's pose 30 times a second, and its colours (lighting, shadows and surface detail) twice a second. The GenXR 4D pipeline writes it from a three.js scene.
@@ -304,6 +367,7 @@ MyScene/
   - Its parts are selectable: a ray click selects one, a hand picks it up, and it keeps moving with the scene.
   - The colours are baked, so nothing is relit and it looks the same in every room. Soft effects (steam, smoke, fire) are baked Gaussians, drawn like a hologram.
   - Things that fly away leave the room.
+- **Placing it:** Add Media with the folder. Its stage stands on the floor at **Height**, facing the user (the container says which side is its front). **Selectable Parts** gives the parts the container names. Its soundtrack is the clock.
 - **Budget:** a two-minute scene of about 160 objects and 400,000 triangles is a container of about 50 MB. It loads in under a second on a Quest 3 and runs at 72 fps; the moments with the most effects close to the viewer are the heaviest.
 - **Won't play:** an animated GLB or a folder of GLB frames (section 5). Export the 4D mesh container from the pipeline instead.
 
@@ -320,7 +384,9 @@ MyScene/
 - [ ] Web pages: made with three.js, and either one self-contained `.html` or a folder with `index.html` whose files are linked by relative paths.
 - [ ] 4D meshes: a folder with the `.sp4m` container (not named `.gz`) and its soundtrack.
 - [ ] The size is reasonable for the app, and you're allowed to ship it.
-- [ ] Added with **Add Media**, the scene saved, and the build's content check passes.
+- [ ] Placed as you want: its order in the scene, and its **Placement**, **Height** and **Up** (section [Placing content in the app](#placing-content-in-the-app)).
+- [ ] Web experiences: added and tested by a coding agent in the Meta XR Simulator (section 12).
+- [ ] Added with **Add Media**, the scene saved, tested in the Meta XR Simulator, and the build's content check passes.
 
 ## Tested with
 Each kind of content in this guide was tested with real files from public sources (2026-09-28 to 2026-10-15) in the Unity editor, and most kinds also in the Meta XR Simulator (Quest 3). Hologram streams, 4D Gaussian splats and 4D meshes have also played on a Quest 3. What testing showed:

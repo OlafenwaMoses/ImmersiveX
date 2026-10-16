@@ -14,7 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - CI:
   - repository checks (`tools/ci/check_repo.py`)
   - Unity EditMode test job, which runs once licence secrets are configured
-- **M1 (in progress):**
+- **M1 (done):**
   - Core runtime:
     - `ImmersiveXSession` start-up flow
     - platform contract (`PlatformAdapter`, `PlatformCapabilities`, `PlatformRegistry`, permission, space and boundary providers)
