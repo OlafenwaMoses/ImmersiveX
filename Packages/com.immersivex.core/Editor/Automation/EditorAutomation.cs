@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -21,8 +22,9 @@ namespace ImmersiveX.Editor
     /// <item><c>play [seconds]</c>: enter Play mode, record the log, take a screenshot, stop after the given time (default 20; 0 = keep playing until <c>stop</c>)</item>
     /// <item><c>capture</c>: screenshot the Game view now</item>
     /// <item><c>invoke rescan|forget|showarea|saveanchor|loadanchor|eraseanchor|scandone|scanskip</c>: press a Device Check or scan button</item>
+    /// <item><c>invoke vr|mr|view</c>: switch to VR or MR as the content menu's buttons do, or say which is on</item>
     /// <item><c>invoke reach</c>: what each hand and controller could grab from where it is now (rays only click) · <c>invoke uirays</c>: can a ray click every panel button</item>
-    /// <item><c>contentmenu status|open|close|toggle|select &lt;n&gt;|device|swipe right|left|both</c> (or <c>cm …</c>): the content menu</item>
+    /// <item><c>contentmenu status|open|close|toggle|select &lt;n&gt;|scroll up|down [rows]|device|swipe right|left|both</c> (or <c>cm …</c>): the content menu</item>
     /// <item><c>prompt primary|secondary</c>: press a button on the ImmersiveX prompt that's showing</item>
     /// <item><c>turn &lt;degrees&gt; &lt;seconds&gt;</c>: turn the rig on the spot (Play mode) to test the guided look-around's coverage and coaching</item>
     /// <item>Commands other packages register with <see cref="RegisterCommand"/>, e.g. ImmersiveX Media's <c>media …</c> and <c>demo</c></item>
@@ -55,6 +57,9 @@ namespace ImmersiveX.Editor
         static float _turnRemaining;
         static float _turnSpeed;
         static double _lastTurnTime;
+        static Vector3 _walkRemaining;
+        static float _walkSpeed;
+        static double _lastWalkTime;
         static int _errors;
         static int _warnings;
 
@@ -82,6 +87,7 @@ namespace ImmersiveX.Editor
             if (UnityEditor.SessionState.GetBool(PlayRunKey, false))
                 AdvancePlayRun();
             AdvanceTurn();
+            AdvanceWalk();
 
             if (!File.Exists(CommandFile) || EditorApplication.isCompiling || EditorApplication.isUpdating)
                 return;
@@ -239,6 +245,9 @@ namespace ImmersiveX.Editor
                 case "turn":
                     StartTurn(command, argument);
                     break;
+                case "walk":
+                    StartWalk(command, argument);
+                    break;
                 case "stop":
                     UnityEditor.SessionState.SetBool(PlayRunKey, false);
                     EditorApplication.isPlaying = false;
@@ -315,6 +324,14 @@ namespace ImmersiveX.Editor
                 case "uirays":
                     var blocked = DescribeUiRays(out var report);
                     WriteResult(command, blocked == 0 ? "ok" : "error", report);
+                    return;
+                case "vr":
+                case "mr":
+                case "view": // "invoke vr|mr": switch the view mode, as the menu's VR and MR buttons do; "invoke view": which one
+                    var modes = ViewModes.Instance ?? throw new InvalidOperationException("No view modes (this platform doesn't show the real world).");
+                    if (action != "view")
+                        modes.Set(action == "vr" ? ViewMode.Virtual : ViewMode.Mixed);
+                    WriteResult(command, "ok", modes.Describe());
                     return;
 
                 default: throw new ArgumentException($"Unknown action '{action}'.");
@@ -411,7 +428,7 @@ namespace ImmersiveX.Editor
         }
 
         /// <summary>
-        /// The content menu: <c>contentmenu status|open|close|toggle|select &lt;n&gt;|device</c> (or <c>cm …</c>), and
+        /// The content menu: <c>contentmenu status|open|close|toggle|select &lt;n&gt;|scroll up|down [rows]|device</c> (or <c>cm …</c>), and
         /// <c>contentmenu swipe right|left|both</c>, which plays a real swipe's path through the hand-swipe detector (both = a
         /// clap, which must not count).
         /// </summary>
@@ -538,6 +555,11 @@ namespace ImmersiveX.Editor
                     menu.Panel.position = new Vector3(float.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture),
                         float.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture), float.Parse(parts[3], System.Globalization.CultureInfo.InvariantCulture));
                     break;
+                case "scroll": // "contentmenu scroll <up|down> [rows]": what the scroll buttons do
+                    if (parts.Length < 2 || (parts[1] != "up" && parts[1] != "down"))
+                        throw new ArgumentException("Usage: contentmenu scroll <up|down> [rows]");
+                    menu.Scroll((parts[1] == "up" ? -1 : 1) * (parts.Length > 2 && int.TryParse(parts[2], out var by) ? by : 1));
+                    break;
                 case "select":
                     if (parts.Length < 2 || !int.TryParse(parts[1], out var n) || menu.ItemAt(n - 1) == null)
                         throw new ArgumentException($"Usage: menu select <1-{menu.Items.Count}>");
@@ -601,6 +623,42 @@ namespace ImmersiveX.Editor
             // look-around (coverage, coaching, prompt follow). XR Simulation's simulated room scanner only follows
             // the simulated device, which is moved with the mouse and keyboard in the Game view.
             session.Origin.transform.RotateAround(session.Origin.Camera.transform.position, Vector3.up, step);
+        }
+
+        static void StartWalk(string command, string argument)
+        {
+            if (!EditorApplication.isPlaying || ImmersiveXSession.Instance == null || ImmersiveXSession.Instance.Origin == null)
+                throw new InvalidOperationException("Walking needs Play mode with an ImmersiveX Session.");
+            var parts = argument.Split(' ');
+            if (parts.Length < 3 || !float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
+                !float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var z) ||
+                !float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) || seconds <= 0f)
+                throw new ArgumentException("Usage: walk <metres right> <metres forward> <seconds>");
+            _walkRemaining = new Vector3(x, 0f, z);
+            _walkSpeed = _walkRemaining.magnitude / seconds;
+            _lastWalkTime = EditorApplication.timeSinceStartup;
+            WriteResult(command, "ok", $"Walking {_walkRemaining.magnitude:0.##} m over {seconds:0.#}s.");
+        }
+
+        /// <summary>Slide the rig across the floor in world space, as if the user walked (X right, Z forward in the world).</summary>
+        static void AdvanceWalk()
+        {
+            if (_walkRemaining == Vector3.zero)
+                return;
+            var session = ImmersiveXSession.Instance;
+            if (!EditorApplication.isPlaying || session == null || session.Origin == null)
+            {
+                _walkRemaining = Vector3.zero;
+                return;
+            }
+
+            var now = EditorApplication.timeSinceStartup;
+            var step = Vector3.ClampMagnitude(_walkRemaining.normalized * _walkSpeed * (float)(now - _lastWalkTime), _walkRemaining.magnitude);
+            _lastWalkTime = now;
+            _walkRemaining -= step;
+            if (_walkRemaining.sqrMagnitude < 1e-8f)
+                _walkRemaining = Vector3.zero;
+            session.Origin.transform.position += step;
         }
 
         // ---------------------------------------------------------------- Play-mode runs

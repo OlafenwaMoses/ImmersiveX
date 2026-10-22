@@ -65,7 +65,7 @@ Add content with **ImmersiveX ▸ Media ▸ Add Media…** (a file, a folder or 
 ### In the headset
 - **Controls:** every piece of content gets play/pause, seek, time and sound controls, plus handles to move, turn (bars and a ring) and resize it.
 - **Parts:** models, web scenes and 4D meshes have selectable parts. A ray click selects a part, a hand picks it up, and **Put back** returns it.
-- **Content menu:** every piece of content in the scene, one shown at a time (the choice is remembered), plus **Quest menu** and **Close app**. Open and close it with a quick sideways swipe of either hand (or controller):
+- **Content menu:** every piece of content in the scene, one shown at a time (the choice is remembered), plus **Quest menu** and **Close app**, and **MR / VR** buttons in its header: MR shows your room, VR puts the content in a dim virtual world (your real walls and furniture glow faintly when you come close). It opens in front of you when the app starts; with more than six pieces it scrolls with the up and down buttons beside the list. Open and close it with a quick sideways swipe of either hand (or controller):
   - **Open:** swipe towards the middle of your body: the right hand from right to left, or the left hand from left to right.
   - **Close:** the reverse: the right hand from left to right, or the left hand from right to left.
   - A swipe is about 22 cm in under 0.3 s, in front of you between chest and forehead. Both hands at once (a clap) doesn't count, and the hand's way back after a swipe is ignored. Swiping again while the menu is elsewhere brings it to you.

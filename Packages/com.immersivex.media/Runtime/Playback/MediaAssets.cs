@@ -17,6 +17,7 @@ namespace ImmersiveX.Media
         static Material _photoTransparent;
         static Material _mesh4D;
         static Material _mesh4DPaint;
+        static Material _mesh4DHologram;
 
         /// <summary>Gaussian splats (holograms, splat files, point clouds).</summary>
         public static Material SplatMaterial => _splats != null ? _splats : _splats = Load("HologramSplats");
@@ -39,6 +40,9 @@ namespace ImmersiveX.Media
         /// <summary>Paints a 4D mesh's colour keyframes into its atlas.</summary>
         public static Material Mesh4DPaintMaterial => _mesh4DPaint != null ? _mesh4DPaint : _mesh4DPaint = Load("Mesh4DPaint");
 
+        /// <summary>4D meshes in the hologram look: light computed per pixel and added over the room.</summary>
+        public static Material Mesh4DHologramMaterial => _mesh4DHologram != null ? _mesh4DHologram : _mesh4DHologram = Load("Mesh4DHologram");
+
         static Material Load(string name)
         {
             var material = Resources.Load<Material>($"{Folder}/{name}");
@@ -57,6 +61,7 @@ namespace ImmersiveX.Media
             _photoTransparent = null;
             _mesh4D = null;
             _mesh4DPaint = null;
+            _mesh4DHologram = null;
         }
     }
 }

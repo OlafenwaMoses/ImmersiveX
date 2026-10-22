@@ -363,11 +363,12 @@ MyScene/
 - **The name ends in `.sp4m`, not `.gz`.** Android's APK packer unzips `.gz` files and drops the extension, so the app couldn't find them. Add Media renames `name.sp4m.gz` to `name.sp4m` when it copies the folder (the player reads gzip either way), and the build check refuses a `.gz` name.
 - **How it shows:**
   - Standing in the room: the scene's ground on the floor, its stage as tall as **Height**, facing you.
-  - It plays on its soundtrack's clock with Immersive Media's controls (play/pause, seek, time, speaker). Captions show above the controls, and cards point at the parts when the content says.
+  - It plays on its soundtrack's clock with Immersive Media's controls (play/pause, seek, time, speaker). Captions show in front of the content, and cards point at the parts when the content says.
   - Its parts are selectable: a ray click selects one, a hand picks it up, and it keeps moving with the scene.
   - The colours are baked, so nothing is relit and it looks the same in every room. Soft effects (steam, smoke, fire) are baked Gaussians, drawn like a hologram.
-  - Things that fly away leave the room.
-- **Placing it:** Add Media with the folder. Its stage stands on the floor at **Height**, facing the user (the container says which side is its front). **Selectable Parts** gives the parts the container names. Its soundtrack is the clock.
+  - **When its subject drives or flies away, the stage follows it:** the subject (a rocket climbing, cars driving off) stays at the content's place at the same size, and what it leaves behind slides away and dissolves at the edge of the room, or sinks below the floor.
+- **Placing it:** Add Media with the folder. Its stage stands on the floor at **Height**, facing the user (the container says which side is its front). A container that says how tall it should stand (`stage.roomHeight`) sets **Height** for you. **Selectable Parts** gives the parts the container names. Its soundtrack is the clock.
+- **Versions:** version 2 is coloured through a texture atlas. Version 3 is coloured per vertex, gives each object its own cutaway, lists its colour keyframes' times, and can say how the stage follows its subject and how wide the piece gets. Version 4 is the hologram look: no colours at all, just each object's hue, gains, contour spacing and height span, drawn as light added over the room with a rim glow, contour lines, a scan band and a materialise front; its glow and how far it has materialised come per frame.
 - **Budget:** a two-minute scene of about 160 objects and 400,000 triangles is a container of about 50 MB. It loads in under a second on a Quest 3 and runs at 72 fps; the moments with the most effects close to the viewer are the heaviest.
 - **Won't play:** an animated GLB or a folder of GLB frames (section 5). Export the 4D mesh container from the pipeline instead.
 

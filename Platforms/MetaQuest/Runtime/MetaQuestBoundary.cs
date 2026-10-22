@@ -4,7 +4,10 @@ using UnityEngine.XR.OpenXR.Features.Meta;
 
 namespace ImmersiveX.Platforms.MetaQuest
 {
-    /// <summary>Hides the Quest boundary while passthrough is showing, so users never draw or see a play area.</summary>
+    /// <summary>
+    /// Hides the Quest boundary while passthrough is showing, so users never draw or see a play area; gives it back in VR
+    /// mode, when the real world is hidden.
+    /// </summary>
     sealed class MetaQuestBoundary : IBoundaryProvider
     {
         static BoundaryVisibilityFeature Feature =>
@@ -49,6 +52,18 @@ namespace ImmersiveX.Platforms.MetaQuest
                 ImmersiveXLog.Warn($"Hiding the boundary failed (XrResult {result}).");
             else
                 ImmersiveXLog.Info("Requested boundary suppression.");
+        }
+
+        public void RequestShow()
+        {
+            var feature = Feature;
+            if (feature == null || !feature.enabled)
+                return;
+            var result = (int)feature.TryRequestBoundaryVisibility(XrBoundaryVisibility.VisibilityNotSuppressed);
+            if (result < 0)
+                ImmersiveXLog.Warn($"Showing the boundary again failed (XrResult {result}).");
+            else
+                ImmersiveXLog.Info("Gave the boundary back to the system (the real world is hidden).");
         }
     }
 }

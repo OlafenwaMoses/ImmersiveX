@@ -17,6 +17,11 @@ namespace ImmersiveX
     /// <item>The opening swipe puts it in front of the user's eyes, close to the headset, wherever they are; while it's open
     /// elsewhere, it comes to them. Moved by its side bars or frame, it stays where it's put until the next opening swipe.</item>
     /// <item>The ray clicks its buttons and a finger presses them.</item>
+    /// <item>When there's more content than fits (six rows), up and down buttons appear on the right of the list, with a
+    /// track between them showing where the rows are in the list; each click scrolls one row.</item>
+    /// <item>MR and VR buttons in its header switch between seeing content in the real room and in a virtual world
+    /// (<see cref="ViewModes"/>); MR at every start.</item>
+    /// <item>It opens in front of the user when the app starts.</item>
     /// </list>
     /// <see cref="ImmersiveXSession"/> adds it when the session is ready (Settings: Content Menu).
     /// </summary>
@@ -30,6 +35,8 @@ namespace ImmersiveX
         const float RowGap = 8f;
         const float FooterHeight = 88f;
         const int RowsPerPage = 6;
+        const float ScrollColumn = 60f; // the scroll buttons' column, right of the rows, when the list overflows
+        const float ScrollButton = 48f;
         const float OpenDistance = 0.55f;
         const float OpenBelowEyes = 0.12f;
         const float InFrontWithin = 1.2f; // "in front of the user": this close…
@@ -37,6 +44,21 @@ namespace ImmersiveX
 
         const float PanelRadius = 28f;
         const float RowRadius = 16f;
+
+        sealed class Scroller
+        {
+            public Button Up, Down;
+            public RectTransform Track, Thumb;
+        }
+
+        sealed class ModeButton
+        {
+            public ViewMode Mode;
+            public Button Button;
+            public Image Background, Icon;
+            public Text Label;
+            public BrandHover Hover;
+        }
 
         sealed class Row
         {
@@ -53,11 +75,13 @@ namespace ImmersiveX
 
         readonly List<IContentItem> _items = new List<IContentItem>();
         readonly List<Row> _rows = new List<Row>();
+        readonly List<ModeButton> _modeButtons = new List<ModeButton>();
+        ViewModes _modes;
         XROrigin _origin;
         HandSwipes _swipes;
         GameObject _panel;
-        Text _pageLabel;
-        int _page;
+        Scroller _scroller;
+        int _first; // the item in the top row
         int _builtFor = -1;
 
         public bool IsOpen => _panel != null && _panel.activeSelf;
@@ -67,6 +91,15 @@ namespace ImmersiveX
         public IReadOnlyList<IContentItem> Items => _items;
         public IContentItem Shown { get; private set; }
         public HandSwipes Swipes => _swipes;
+
+        /// <summary>True when there's more content than rows, so the list scrolls.</summary>
+        public bool Scrolls => _items.Count > RowsPerPage;
+
+        /// <summary>The item in the top row (0-based).</summary>
+        public int FirstRow => _first;
+
+        /// <summary>The items in the rows, top to bottom.</summary>
+        public IEnumerable<IContentItem> VisibleItems => _items.Skip(_first).Take(RowsPerPage);
 
         /// <summary>Add the menu (and its swipe watcher) for <paramref name="origin"/>'s user, and show one piece of content.</summary>
         public static ContentMenu Create(XROrigin origin)
@@ -92,8 +125,16 @@ namespace ImmersiveX
 
         void OnDestroy()
         {
+            if (_modes != null)
+                _modes.Changed -= OnModeChanged;
             if (Instance == this)
                 Instance = null;
+        }
+
+        void OnModeChanged(ViewMode mode)
+        {
+            if (IsOpen)
+                Paint();
         }
 
         // ---------------------------------------------------------------- opening and closing
@@ -129,8 +170,10 @@ namespace ImmersiveX
         public void Open()
         {
             FindItems();
-            if (_page * RowsPerPage >= _items.Count)
-                _page = 0;
+            _first = ClampFirst(_first);
+            var shown = Shown != null ? _items.IndexOf(Shown) : -1;
+            if (shown >= 0 && (shown < _first || shown >= _first + RowsPerPage))
+                _first = ClampFirst(shown - RowsPerPage / 2); // the content that's showing is in view when the menu opens
             Build();
             Paint();
             Place();
@@ -220,13 +263,23 @@ namespace ImmersiveX
         void Build()
         {
             var rows = Mathf.Clamp(_items.Count, 1, RowsPerPage);
-            if (_panel != null && _builtFor == rows)
+            var scrolls = Scrolls;
+            if (_modes == null && ViewModes.Instance != null)
+            {
+                _modes = ViewModes.Instance;
+                _modes.Changed += OnModeChanged;
+            }
+
+            var key = rows * 4 + (scrolls ? 1 : 0) + (_modes != null ? 2 : 0);
+            if (_panel != null && _builtFor == key)
                 return;
             var wasPlaced = _panel != null ? new Pose(_panel.transform.position, _panel.transform.rotation) : (Pose?)null;
             if (_panel != null)
                 Destroy(_panel);
-            _builtFor = rows;
+            _builtFor = key;
             _rows.Clear();
+            _modeButtons.Clear();
+            _scroller = null;
 
             var height = HeaderHeight + rows * (RowHeight + RowGap) + FooterHeight;
             _panel = new GameObject("Content Menu Panel");
@@ -244,17 +297,20 @@ namespace ImmersiveX
             eyebrow.color = Brand.Gold;
             var title = WorldUi.Label(canvas, "Title", "Content", 30, new Vector2(-Width * 0.5f + 128f, top - 52f), new Vector2(216f, 40f), FontStyle.Bold, TextAnchor.MiddleLeft);
             title.color = Brand.Ink;
-            _pageLabel = WorldUi.Label(canvas, "Page", string.Empty, 17, new Vector2(70f, top - 40f), new Vector2(90f, 36f), FontStyle.Normal, TextAnchor.MiddleCenter);
-            _pageLabel.color = Brand.Ink2;
-            Brand.Pill(canvas, "‹", new Vector2(4f, top - 40f), new Vector2(44f, 44f), false, () => Turn(-1), 24);
-            Brand.Pill(canvas, "›", new Vector2(136f, top - 40f), new Vector2(44f, 44f), false, () => Turn(1), 24);
             Brand.Pill(canvas, "×", new Vector2(Width * 0.5f - 38f, top - 40f), new Vector2(48f, 48f), false, Close, 26);
+            if (_modes != null)
+                BuildModeSwitch(canvas, new Vector2(66f, top - 40f));
 
+            var rowWidth = Width - 32f - (scrolls ? ScrollColumn : 0f);
+            var rowX = scrolls ? -ScrollColumn * 0.5f : 0f;
             for (var i = 0; i < rows; i++)
             {
                 var y = top - HeaderHeight - i * (RowHeight + RowGap) - RowHeight * 0.5f;
-                _rows.Add(BuildRow(canvas, i, y));
+                _rows.Add(BuildRow(canvas, i, new Vector2(rowX, y), rowWidth));
             }
+
+            if (scrolls)
+                _scroller = BuildScroller(canvas, top - HeaderHeight, rows * (RowHeight + RowGap) - RowGap);
 
             var footer = -height * 0.5f + FooterHeight * 0.5f;
             Brand.Pill(canvas, "Quest menu", new Vector2(-104f, footer), new Vector2(196f, 54f), false, OpenDeviceMenu);
@@ -264,11 +320,11 @@ namespace ImmersiveX
             PanelMover.Attach(_panel, new Vector2(Width / 1000f, height / 1000f));
         }
 
-        Row BuildRow(Transform canvas, int index, float y)
+        Row BuildRow(Transform canvas, int index, Vector2 position, float width)
         {
             var row = new Row();
-            var size = new Vector2(Width - 32f, RowHeight);
-            var box = WorldUi.Box(canvas, $"Row {index + 1}", new Vector2(0f, y), size);
+            var size = new Vector2(width, RowHeight);
+            var box = WorldUi.Box(canvas, $"Row {index + 1}", position, size);
             row.Background = Brand.Round(box.gameObject.AddComponent<Image>(), RowRadius);
             row.Background.color = Brand.Card;
             row.Border = Brand.Hairline(box, Vector2.zero, size, RowRadius, Brand.Line);
@@ -295,28 +351,85 @@ namespace ImmersiveX
             return row;
         }
 
-        void Turn(int pages)
+        /// <summary>The MR and VR buttons, side by side in one pill: an icon and its name each; the mode in use is gold.</summary>
+        void BuildModeSwitch(Transform canvas, Vector2 centre)
         {
-            var count = Mathf.Max(1, Mathf.CeilToInt(_items.Count / (float)RowsPerPage));
-            _page = (_page + pages + count) % count;
+            const float segment = 84f, height = 48f;
+            var frame = WorldUi.Box(canvas, "View mode", centre, new Vector2(segment * 2f + 8f, height + 8f));
+            Brand.Round(frame.gameObject.AddComponent<Image>(), (height + 8f) * 0.5f).color = Brand.Card;
+            Brand.Hairline(frame, Vector2.zero, frame.sizeDelta, (height + 8f) * 0.5f, Brand.Line);
+            foreach (var mode in new[] { ViewMode.Mixed, ViewMode.Virtual })
+            {
+                var button = new ModeButton { Mode = mode };
+                var box = WorldUi.Box(frame, mode == ViewMode.Mixed ? "MR" : "VR", new Vector2((mode == ViewMode.Mixed ? -0.5f : 0.5f) * segment, 0f), new Vector2(segment, height));
+                button.Background = Brand.Round(box.gameObject.AddComponent<Image>(), height * 0.5f);
+                button.Button = box.gameObject.AddComponent<Button>();
+                button.Button.targetGraphic = button.Background;
+                button.Button.transition = Selectable.Transition.None;
+                button.Button.navigation = new Navigation { mode = Navigation.Mode.None };
+                button.Button.onClick.AddListener(() => _modes.Set(mode));
+                var icon = WorldUi.Box(box, "Icon", new Vector2(-17f, 0f), new Vector2(34f, 34f));
+                button.Icon = icon.gameObject.AddComponent<Image>();
+                button.Icon.sprite = ModeIcons.For(mode);
+                button.Icon.preserveAspect = true;
+                button.Icon.raycastTarget = false;
+                button.Label = WorldUi.Label(box, "Label", mode == ViewMode.Mixed ? "MR" : "VR", 17, new Vector2(20f, 0f), new Vector2(40f, height), FontStyle.Bold, TextAnchor.MiddleCenter);
+                button.Label.raycastTarget = false;
+                button.Hover = box.gameObject.AddComponent<BrandHover>();
+                button.Hover.Background = button.Background;
+                button.Hover.Text = button.Label;
+                _modeButtons.Add(button);
+            }
+        }
+
+        /// <summary>Switch between MR and VR (automation and tests; the header's buttons do the same).</summary>
+        public void SetViewMode(ViewMode mode) => _modes?.Set(mode);
+
+        /// <summary>The scroll column right of the rows: an up button at the top of the list, a down button at the bottom, and
+        /// between them a track whose gold thumb shows which part of the list the rows hold.</summary>
+        Scroller BuildScroller(Transform canvas, float listTop, float listHeight)
+        {
+            var x = Width * 0.5f - 16f - ScrollColumn * 0.5f + 6f;
+            var scroller = new Scroller
+            {
+                Up = Brand.Pill(canvas, "▲", new Vector2(x, listTop - ScrollButton * 0.5f), new Vector2(ScrollButton, ScrollButton), false, () => Scroll(-1), 18),
+                Down = Brand.Pill(canvas, "▼", new Vector2(x, listTop - listHeight + ScrollButton * 0.5f), new Vector2(ScrollButton, ScrollButton), false, () => Scroll(1), 18),
+            };
+            scroller.Up.name = "Scroll up";
+            scroller.Down.name = "Scroll down";
+            var trackHeight = listHeight - 2f * ScrollButton - 24f;
+            scroller.Track = WorldUi.Box(canvas, "Scroll track", new Vector2(x, listTop - listHeight * 0.5f), new Vector2(6f, trackHeight));
+            Brand.Round(scroller.Track.gameObject.AddComponent<Image>(), 3f).color = Brand.Line;
+            scroller.Thumb = WorldUi.Box(scroller.Track, "Thumb", Vector2.zero, new Vector2(6f, trackHeight));
+            Brand.Round(scroller.Thumb.gameObject.AddComponent<Image>(), 3f).color = Brand.Gold;
+            return scroller;
+        }
+
+        /// <summary>Scroll the list by <paramref name="rows"/> rows (negative: up), stopping at its ends.</summary>
+        public void Scroll(int rows)
+        {
+            var first = ClampFirst(_first + rows);
+            if (first == _first)
+                return;
+            _first = first;
+            ImmersiveXLog.Info($"Content menu: scrolled {(rows < 0 ? "up" : "down")}; rows {_first + 1}–{Mathf.Min(_items.Count, _first + RowsPerPage)} of {_items.Count}.");
             Paint();
         }
+
+        int ClampFirst(int first) => Mathf.Clamp(first, 0, Mathf.Max(0, _items.Count - RowsPerPage));
 
         /// <summary>Fill the rows for the current page and highlight the content that's showing.</summary>
         void Paint()
         {
             if (_panel == null)
                 return;
-            var pages = Mathf.Max(1, Mathf.CeilToInt(_items.Count / (float)RowsPerPage));
-            _pageLabel.text = pages > 1 ? $"{_page + 1} / {pages}" : string.Empty;
-            foreach (var arrow in _pageLabel.transform.parent.GetComponentsInChildren<Button>(true))
-                if (arrow.name == "‹" || arrow.name == "›")
-                    arrow.gameObject.SetActive(pages > 1);
+            PaintScroller();
+            PaintModeSwitch();
 
             for (var i = 0; i < _rows.Count; i++)
             {
                 var row = _rows[i];
-                var item = ItemAt(_page * RowsPerPage + i);
+                var item = ItemAt(_first + i);
                 row.Item = item;
                 row.Background.gameObject.SetActive(item != null || (i == 0 && _items.Count == 0));
                 if (item == null)
@@ -342,6 +455,41 @@ namespace ImmersiveX
             }
         }
 
+        void PaintModeSwitch()
+        {
+            foreach (var button in _modeButtons)
+            {
+                var on = _modes != null && _modes.Mode == button.Mode;
+                if (on)
+                    button.Hover.Set(Brand.GoldButton, null, Brand.Gold, null, Brand.OnGold, Brand.OnGold);
+                else
+                    button.Hover.Set(new Color(0f, 0f, 0f, 0f), null, Brand.GhostHover, null, Brand.Ink2, Brand.Ink);
+                button.Icon.color = on ? Brand.OnGold : Brand.Ink2;
+            }
+        }
+
+        void PaintScroller()
+        {
+            if (_scroller == null)
+                return;
+            var last = Mathf.Max(0, _items.Count - RowsPerPage);
+            SetEnabled(_scroller.Up, _first > 0);
+            SetEnabled(_scroller.Down, _first < last);
+            var track = _scroller.Track.sizeDelta.y;
+            var thumb = Mathf.Max(18f, track * RowsPerPage / Mathf.Max(1f, _items.Count));
+            _scroller.Thumb.sizeDelta = new Vector2(6f, thumb);
+            var along = last > 0 ? _first / (float)last : 0f;
+            _scroller.Thumb.anchoredPosition = new Vector2(0f, (track - thumb) * (0.5f - along));
+        }
+
+        /// <summary>A scroll button at the end of the list fades and stops taking clicks.</summary>
+        static void SetEnabled(Button button, bool enabled)
+        {
+            button.interactable = enabled;
+            foreach (var graphic in button.GetComponentsInChildren<Graphic>(true))
+                graphic.canvasRenderer.SetAlpha(enabled ? 1f : 0.3f);
+        }
+
         // ---------------------------------------------------------------- device
 
         public void OpenDeviceMenu()
@@ -365,6 +513,8 @@ namespace ImmersiveX
         public string Describe() =>
             $"menu {(IsOpen ? "open" : "closed")} · showing {(Shown != null ? $"'{Shown.Title}'" : "nothing")} · " +
             $"{_items.Count} item(s): {string.Join(", ", _items.Select((i, n) => $"{n + 1}. {i.Title}{(i.IsShown ? " (shown)" : string.Empty)}"))} · " +
+            (Scrolls ? $"scrolls: rows {_first + 1}–{Mathf.Min(_items.Count, _first + RowsPerPage)} in view · " : string.Empty) +
+            (_modes != null ? $"view {(_modes.Mode == ViewMode.Virtual ? "VR" : "MR")} · " : string.Empty) +
             $"swipes recognised: {(_swipes != null ? _swipes.Count : 0)}";
 
         Transform Viewer() =>

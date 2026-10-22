@@ -183,7 +183,7 @@ namespace ImmersiveX.Media
 
         Transform IHandleTarget.Root => transform;
 
-        Transform IHandleTarget.Controls => _controls != null ? _controls.transform : null;
+        Transform IHandleTarget.Controls => _controls != null ? _controls.Panel : null;
 
         /// <summary>The visible media's bounds in world space (for handles and layout).</summary>
         public Bounds WorldBounds
@@ -749,7 +749,11 @@ namespace ImmersiveX.Media
                 Play();
         }
 
-        /// <summary>Put the controls where they suit the media: in front of it, under a screen, or in front of the user.</summary>
+        /// <summary>
+        /// The controls stay within reach of the user, low on their right (see <see cref="WithinReach"/>), whatever the media.
+        /// Narrated media's caption goes where the user watches: in front of standing media, under a screen, or in front of
+        /// the user for media all around them.
+        /// </summary>
         void PlaceControls()
         {
             if (!_showControls || _playable is IMediaOwnControls)
@@ -768,79 +772,39 @@ namespace ImmersiveX.Media
             if (head == null)
                 return;
             if (_controls == null)
-                _controls = MediaControls.Create(this, transform);
+            {
+                _controls = MediaControls.Create(this, Name, Viewer);
+                _controls.Hold = () => _handles != null && _handles.IsDragging; // the move bar under it is in use
+            }
 
             var presentation = _playable?.Presentation ?? MediaPresentation.Standing;
             if (presentation == MediaPresentation.Surround)
             {
                 // Floating in front of the user, a little below the eyes; it stays where it is.
                 var user = UserRelativePlacement.UserPose(head);
-                var at = user.position + user.rotation * new Vector3(0f, -0.45f, 0.85f);
-                _controls.Follow(null);
-                _controls.Place(at, head.position);
+                _controls.PlaceCaption(null, user.position + user.rotation * new Vector3(0f, -0.32f, 0.85f));
                 return;
             }
 
             var towardUser = -transform.forward;
+            // standing content: in front of it, clear of its front edge when it's wider than the usual 0.6 m, but never
+            // further out than 0.6 m short of the user (who may be standing inside a wide scene)
+            var front = _playable != null && _playable.IsLoaded ? -_playable.Bounds.min.z : 0f;
+            var toUser = Vector3.Distance(Flat(transform.position), Flat(head.position));
+            var ahead = Mathf.Max(0.6f, Mathf.Min(front + 0.3f, toUser - 0.6f));
             var offset = presentation == MediaPresentation.Screen
-                ? towardUser * 0.3f + Vector3.up * (ScreenBottom - 0.2f)
-                : towardUser * 0.6f + Vector3.up * 0.8f;
-            _controls.Follow(transform);
-            _controls.Place(offset, head.position);
+                ? towardUser * 0.3f + Vector3.up * (ScreenBottom - 0.08f)
+                : towardUser * ahead + Vector3.up * 0.92f;
+            _controls.PlaceCaption(transform, offset, towardViewer: presentation == MediaPresentation.Standing);
         }
 
         static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
 
-        /// <summary>
-        /// The floor under the user: the mapped room's floor; else the XR Origin when tracking starts at the floor; else the
-        /// lowest upward-facing surface found so far; else a standing eye height below the head.
-        /// </summary>
-        static float FloorHeight()
-        {
-            const float StandingEyeHeight = 1.5f;
-            var session = ImmersiveXSession.Instance;
-            var head = Viewer();
-            if (session != null && session.Walkable != null)
-                return session.FloorPose.position.y;
-
-            var origin = session != null ? session.Origin : null;
-            if (origin == null)
-                return head != null ? head.position.y - StandingEyeHeight : 0f;
-            if (origin.CurrentTrackingOriginMode == TrackingOriginModeFlags.Floor)
-                return origin.transform.position.y;
-
-            var eye = head != null ? head.position.y : origin.transform.position.y;
-            var floor = eye - StandingEyeHeight;
-            var found = false;
-            var planes = origin.GetComponent<ARPlaneManager>();
-            if (planes != null)
-            {
-                foreach (var plane in planes.trackables)
-                {
-                    var y = plane.transform.position.y;
-                    if (plane.alignment == PlaneAlignment.HorizontalUp && y < eye - 0.8f && (!found || y < floor))
-                    {
-                        floor = y;
-                        found = true;
-                    }
-                }
-            }
-
-            return floor;
-        }
+        /// <summary>The floor under the user (see <see cref="RoomFloor.Height"/>).</summary>
+        static float FloorHeight() => RoomFloor.Height(Viewer());
 
         /// <summary>The middle of the mapped room's walkable area, in world space.</summary>
-        static bool TryRoomCentre(out Vector3 centre)
-        {
-            centre = default;
-            var session = ImmersiveXSession.Instance;
-            var middle = session != null && session.Walkable != null ? session.Walkable.Centre() : null;
-            if (!middle.HasValue)
-                return false;
-            var floor = session.FloorPose;
-            centre = floor.position + floor.rotation * new Vector3(middle.Value.x, 0f, middle.Value.y);
-            return true;
-        }
+        static bool TryRoomCentre(out Vector3 centre) => RoomFloor.TryCentre(out centre);
 
         static bool IsWalkable(Vector3 world)
         {

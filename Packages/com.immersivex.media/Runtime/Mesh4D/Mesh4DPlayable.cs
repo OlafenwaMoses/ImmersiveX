@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -8,13 +9,16 @@ namespace ImmersiveX.Media
 {
     /// <summary>
     /// A 4D mesh (<see cref="Mesh4DContainer"/>, <c>.sp4m</c> or <c>.sp4m.gz</c>): a scene baked over time and played back
-    /// as moving meshes coloured from the scene's own lighting, with its soft effects as Gaussians, its soundtrack as the
-    /// clock, and its captions and callouts shown in the room.
+    /// as moving meshes coloured from the scene's own lighting (or, for a hologram, as light added over the room), with its
+    /// soft effects as Gaussians, its soundtrack as the clock, and its captions and callouts shown in the room.
     /// <list type="bullet">
     /// <item>Placement follows the content's stage: its ground is the floor, its subject's centre stands at the media's
     /// place, the side its film camera watched from faces the user, and its height at the start is fitted to Height.</item>
     /// <item>It has the standard controls (play, pause, seek, volume) and handles; its parts can be selected and moved
     /// while it's paused, like a model's.</item>
+    /// <item>When its subject drives or flies away (a car leaving, a rocket climbing), the stage follows it: the subject
+    /// stays at the media's place at the same size, and what it leaves behind slides away and dissolves at the edge of
+    /// the room, or sinks below the floor.</item>
     /// </list>
     /// </summary>
     sealed class Mesh4DPlayable : IMediaPlayable, IMediaAnnotations, IMediaParts
@@ -28,11 +32,16 @@ namespace ImmersiveX.Media
         Mesh4DLate _late;
         Mesh4DParts _parts;
         float _loadProgress;
+        Vector3 _home; // the 4D scene's place in the media before any following
+        Quaternion _turn;
+        float _scale;
+        Vector3 _subject0;
+        float _followRadius, _followDeadZone;
         readonly List<MediaCallout> _callouts = new List<MediaCallout>();
 
         public string Description => _c == null
             ? "4D mesh"
-            : $"4D mesh · {_c.ObjectCount} objects · {_renderer?.VisibleTriangles ?? _c.Triangles:N0} triangles · {_c.Probes:N0} colour probes · " +
+            : $"4D mesh · {_c.ObjectCount} objects · {_renderer?.VisibleTriangles ?? _c.Triangles:N0} triangles · {(_c.IsHologram ? "hologram" : $"{_c.Probes:N0} colour probes")} · " +
               $"{_renderer?.EffectCount ?? 0:N0} effect Gaussians · audio {AudioState}";
 
         string AudioState => _audio == null ? "none" : _audio.Failed ? "unavailable" : !_audio.IsReady ? "loading" : _audio.IsPlaying ? "playing" : "ready";
@@ -48,23 +57,54 @@ namespace ImmersiveX.Media
         public Bounds Bounds => _bounds;
         public ContentParts Parts => _parts?.Parts;
 
+        /// <summary>
+        /// Where a container from <paramref name="url"/> is cached: one file per URL and app build, so a new build's content
+        /// replaces the old copy (older copies are removed).
+        /// </summary>
+        static string CachePath(string url)
+        {
+            var folder = Path.Combine(Application.temporaryCachePath, "ImmersiveX", "Mesh4D");
+            var name = $"{Hash(url)}-{Hash(Application.buildGUID + Application.version)}{(MediaSource.FileName(url).EndsWith(".gz", StringComparison.OrdinalIgnoreCase) ? ".sp4m.gz" : ".sp4m")}";
+            if (Directory.Exists(folder))
+                foreach (var old in Directory.GetFiles(folder, Hash(url) + "-*"))
+                    if (Path.GetFileName(old) != name)
+                        File.Delete(old);
+            return Path.Combine(folder, name);
+        }
+
+        static string Hash(string text)
+        {
+            unchecked
+            {
+                var h = 2166136261u; // FNV-1a
+                foreach (var c in text)
+                    h = (h ^ c) * 16777619u;
+                return h.ToString("x8");
+            }
+        }
+
         public IEnumerator Load(MediaContext context)
         {
             _context = context;
             byte[] bytes = context.Prefetched;
-            if (bytes == null)
+            string path = null;
+            if (bytes == null && !MediaSource.TryLocalFile(context.Url, out path))
             {
-                yield return MediaSource.Fetch(context.Url, (b, e) =>
+                // Inside an APK (or on the web): copy the file to the cache once, then read it from there, so a large
+                // container is never held in memory twice (downloaded, then unpacked).
+                path = CachePath(context.Url);
+                if (!File.Exists(path))
                 {
-                    bytes = b;
-                    Error = e;
-                }, p => _loadProgress = p * 0.5f);
-                if (Error != null)
-                    yield break;
+                    var copying = Time.realtimeSinceStartup;
+                    yield return MediaSource.FetchToFile(context.Url, path, e => Error = e, p => _loadProgress = p * 0.5f);
+                    if (Error != null)
+                        yield break;
+                    ImmersiveXLog.Info($"4D mesh: copied {MediaSource.FileName(context.Url)} ({new FileInfo(path).Length / 1e6:0} MB) to the cache in {Time.realtimeSinceStartup - copying:0.0} s.");
+                }
             }
 
             var started = Time.realtimeSinceStartup;
-            var read = Task.Run(() => Mesh4DContainer.Read(bytes));
+            var read = Task.Run(() => path != null ? Mesh4DContainer.ReadFile(path) : Mesh4DContainer.Read(bytes));
             while (!read.IsCompleted)
                 yield return null;
             if (read.IsFaulted)
@@ -76,13 +116,14 @@ namespace ImmersiveX.Media
             _c = read.Result;
             _loadProgress = 0.8f;
             ImmersiveXLog.Info($"4D mesh: '{_c.Title}' read in {Time.realtimeSinceStartup - started:0.0} s: {_c.ObjectCount} objects, {_c.Triangles:N0} triangles, " +
-                               $"{_c.Probes:N0} probes × {_c.ColorKeys} colour keys, {_c.Frames} frames at {_c.Fps:0} fps ({MediaControls.FormatTime(_c.Duration)}), " +
+                               $"{(_c.IsHologram ? "the hologram look" : $"{_c.Probes:N0} probes × {_c.ColorKeys} colour keys")}, {_c.Frames} frames at {_c.Fps:0} fps ({MediaControls.FormatTime(_c.Duration)}), " +
                                $"{(_c.HasEffects ? "effects" : "no effects")}.");
 
-            var atlasBoxes = context.SelectableParts ? Mesh4DParts.MeasureAtlasBoxes(_c) : null;
+            var atlasBoxes = context.SelectableParts && !_c.IsHologram ? Mesh4DParts.MeasureAtlasBoxes(_c) : null;
             try
             {
-                _renderer = new Mesh4DRenderer(_c, context.Root, MediaAssets.Mesh4DMaterial, MediaAssets.Mesh4DPaintMaterial, MediaAssets.SplatMaterial);
+                _renderer = new Mesh4DRenderer(_c, context.Root, MediaAssets.Mesh4DMaterial, MediaAssets.Mesh4DPaintMaterial, MediaAssets.SplatMaterial,
+                    _c.IsHologram ? MediaAssets.Mesh4DHologramMaterial : null);
             }
             catch (Exception exception)
             {
@@ -118,7 +159,64 @@ namespace ImmersiveX.Media
             root.localRotation = turn;
             root.localScale = new Vector3(scale, scale, -scale);
             root.localPosition = turn * new Vector3(-scale * _c.Centre.x, -scale * _c.Ground, scale * _c.Centre.y);
+            _home = root.localPosition;
+            _turn = turn;
+            _scale = scale;
             _bounds = StageBounds();
+            SetUpFollow();
+        }
+
+        /// <summary>
+        /// The subject (the per-frame subject floats) is followed once it leaves. The content can say how (its header's
+        /// <c>follow</c>); otherwise a subject that ends up more than one and a half stage heights from where it started is
+        /// held within a quarter of a stage height of it, and the set dissolves two stage heights from it.
+        /// </summary>
+        void SetUpFollow()
+        {
+            const int subject = Mesh4DContainer.FloatsPerFrame - 3;
+            var f = _c.FrameFloats;
+            _subject0 = new Vector3(f[subject], f[subject + 1], f[subject + 2]);
+            if (float.IsNaN(_subject0.x))
+                return;
+            if (_c.FollowRadius > 0f)
+            {
+                _followRadius = _c.FollowRadius;
+                _followDeadZone = _c.FollowDeadZone;
+                return;
+            }
+
+            var farthest = 0f;
+            for (var i = 0; i < _c.Frames; i++)
+            {
+                var b = i * Mesh4DContainer.FloatsPerFrame + subject;
+                var d = new Vector3(f[b], f[b + 1], f[b + 2]) - _subject0;
+                if (!float.IsNaN(d.x))
+                    farthest = Mathf.Max(farthest, d.magnitude);
+            }
+
+            if (farthest > 1.5f * _c.StageHeight)
+            {
+                _followRadius = 2f * _c.StageHeight;
+                _followDeadZone = 0.25f * _c.StageHeight;
+            }
+        }
+
+        /// <summary>Keep the subject at the media's place once it has left its dead zone, and let the set fall away.</summary>
+        void Follow()
+        {
+            if (_followRadius <= 0f)
+                return;
+            const int subject = Mesh4DContainer.FloatsPerFrame - 3;
+            var s = new Vector3(_renderer.Floats[subject], _renderer.Floats[subject + 1], _renderer.Floats[subject + 2]);
+            var away = s - _subject0;
+            var distance = away.magnitude;
+            var offset = distance > _followDeadZone && !float.IsNaN(distance) ? away * (1f - _followDeadZone / distance) : Vector3.zero;
+            // content z is mirrored into the room (scale -z), so its offset goes back with the opposite sign
+            _renderer.Root.localPosition = _home + _turn * new Vector3(-_scale * offset.x, -_scale * offset.y, _scale * offset.z);
+            if (offset.sqrMagnitude > 1e-8f)
+                _renderer.Focus(new Vector2(s.x, s.z), _followRadius, _c.Ground + offset.y);
+            else
+                _renderer.Focus(Vector2.zero, 0f, _c.Ground);
         }
 
         /// <summary>The objects visible at the start, in the media's space (for grabbing and layout).</summary>
@@ -148,6 +246,17 @@ namespace ImmersiveX.Media
             var height = _context.Height;
             bounds.Encapsulate(new Vector3(bounds.center.x, 0f, bounds.center.z));
             bounds.Encapsulate(new Vector3(bounds.center.x, height, bounds.center.z));
+            if (_c.Footprint.x > 0f && _c.Footprint.y > 0f)
+            {
+                // the content says how wide it gets over the whole piece: the handles and the controls go around that
+                var half = new Vector3(_c.Footprint.x, 0f, _c.Footprint.y) * (0.5f * root.localScale.x);
+                for (var corner = 0; corner < 4; corner++)
+                {
+                    var p = root.localRotation * new Vector3((corner & 1) == 0 ? -half.x : half.x, 0f, (corner & 2) == 0 ? -half.z : half.z);
+                    bounds.Encapsulate(root.localPosition + new Vector3(p.x, 0f, p.z) + root.localRotation * new Vector3(root.localScale.x * _c.Centre.x, 0f, -root.localScale.x * _c.Centre.y));
+                }
+            }
+
             return bounds;
         }
 
@@ -183,6 +292,7 @@ namespace ImmersiveX.Media
         void Show(double t, Transform viewer)
         {
             _renderer.Pose(t);
+            Follow();
             _renderer.PoseEffects(t, viewer);
             _parts?.Pose();
             UpdateAnnotations(t);
