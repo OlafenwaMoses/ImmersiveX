@@ -22,6 +22,8 @@ namespace ImmersiveX
     /// <item>MR and VR buttons in its header switch between seeing content in the real room and in a virtual world
     /// (<see cref="ViewModes"/>); MR at every start.</item>
     /// <item>It opens in front of the user when the app starts.</item>
+    /// <item>Its <b>Space</b> button (a green dot when the room is saved, amber when not) opens <see cref="SpacePanel"/>: what's
+    /// saved about the room, with Re-create space (map it again; the menu comes back when that's done) and Back.</item>
     /// </list>
     /// <see cref="ImmersiveXSession"/> adds it when the session is ready (Settings: Content Menu).
     /// </summary>
@@ -77,6 +79,9 @@ namespace ImmersiveX
         readonly List<Row> _rows = new List<Row>();
         readonly List<ModeButton> _modeButtons = new List<ModeButton>();
         ViewModes _modes;
+        SpacePanel _space;
+        Image _spaceDot;
+        bool _awaitingScan;
         XROrigin _origin;
         HandSwipes _swipes;
         GameObject _panel;
@@ -84,7 +89,10 @@ namespace ImmersiveX
         int _first; // the item in the top row
         int _builtFor = -1;
 
-        public bool IsOpen => _panel != null && _panel.activeSelf;
+        public bool IsOpen => (_panel != null && _panel.activeSelf) || (_space != null && _space.IsShowing);
+
+        /// <summary>The Space panel, once it has been opened.</summary>
+        public SpacePanel Space => _space;
 
         /// <summary>The menu's panel (automation and tests move it about).</summary>
         public Transform Panel => _panel != null ? _panel.transform : null;
@@ -170,6 +178,8 @@ namespace ImmersiveX
         public void Open()
         {
             FindItems();
+            if (_space != null)
+                _space.Hide();
             _first = ClampFirst(_first);
             var shown = Shown != null ? _items.IndexOf(Shown) : -1;
             if (shown >= 0 && (shown < _first || shown >= _first + RowsPerPage))
@@ -185,6 +195,59 @@ namespace ImmersiveX
             if (!IsOpen)
                 return;
             _panel.SetActive(false);
+            if (_space != null)
+                _space.Hide();
+        }
+
+        // ---------------------------------------------------------------- the room's space
+
+        /// <summary>Show the Space panel where the menu is (the menu hides behind it until Back).</summary>
+        public void OpenSpace()
+        {
+            if (_panel == null)
+                Open();
+            if (_space == null)
+                _space = SpacePanel.Create(transform, BackFromSpace, RecreateSpace);
+            _space.Show(new Pose(_panel.transform.position, _panel.transform.rotation));
+            _panel.SetActive(false);
+            ImmersiveXLog.Info($"Content menu: Space panel · {_space.Says}");
+        }
+
+        public void BackFromSpace()
+        {
+            if (_space != null)
+                _space.Hide();
+            if (_panel != null)
+            {
+                _panel.SetActive(true);
+                Paint();
+            }
+        }
+
+        /// <summary>Map the room again (Quest: Space Setup); the menu comes back in front of the user when it's done.</summary>
+        public void RecreateSpace()
+        {
+            var session = ImmersiveXSession.Instance;
+            if (session == null || !session.CanRescanRoom)
+            {
+                ImmersiveXLog.Warn("Content menu: the room can't be mapped again right now.");
+                return;
+            }
+
+            ImmersiveXLog.Info("Content menu: re-creating the room's space.");
+            Close();
+            _awaitingScan = true;
+            session.RescanRoom();
+        }
+
+        void Update()
+        {
+            var session = ImmersiveXSession.Instance;
+            if (!_awaitingScan || session == null || session.IsMappingRoom)
+                return;
+            _awaitingScan = false;
+            ImmersiveXLog.Info($"Content menu: the room mapping finished ({session.RoomStatus}); back to the menu.");
+            Open();
         }
 
         /// <summary>In front of the user's eyes, close to the headset, a little below eye level, facing them.</summary>
@@ -313,8 +376,12 @@ namespace ImmersiveX
                 _scroller = BuildScroller(canvas, top - HeaderHeight, rows * (RowHeight + RowGap) - RowGap);
 
             var footer = -height * 0.5f + FooterHeight * 0.5f;
-            Brand.Pill(canvas, "Quest menu", new Vector2(-104f, footer), new Vector2(196f, 54f), false, OpenDeviceMenu);
-            Brand.Pill(canvas, "Close app", new Vector2(104f, footer), new Vector2(196f, 54f), true, QuitApp);
+            var space = Brand.Pill(canvas, "Space", new Vector2(-146f, footer), new Vector2(136f, 54f), false, OpenSpace);
+            space.GetComponentInChildren<Text>().rectTransform.anchoredPosition = new Vector2(9f, 0f);
+            _spaceDot = Brand.Round(WorldUi.Box(space.transform, "Saved", new Vector2(-38f, 0f), new Vector2(12f, 12f)).gameObject.AddComponent<Image>(), 6f);
+            _spaceDot.raycastTarget = false;
+            Brand.Pill(canvas, "Quest menu", new Vector2(0f, footer), new Vector2(136f, 54f), false, OpenDeviceMenu);
+            Brand.Pill(canvas, "Close app", new Vector2(146f, footer), new Vector2(136f, 54f), true, QuitApp);
 
             // Moved by its side anchors (the ray or a hand) or its frame (a hand); the ray on its face only clicks.
             PanelMover.Attach(_panel, new Vector2(Width / 1000f, height / 1000f));
@@ -425,6 +492,11 @@ namespace ImmersiveX
                 return;
             PaintScroller();
             PaintModeSwitch();
+            if (_spaceDot != null)
+            {
+                var session = ImmersiveXSession.Instance;
+                _spaceDot.color = session != null && session.CurrentSpace != null ? SpacePanel.Saved : SpacePanel.NotSaved;
+            }
 
             for (var i = 0; i < _rows.Count; i++)
             {
@@ -515,6 +587,7 @@ namespace ImmersiveX
             $"{_items.Count} item(s): {string.Join(", ", _items.Select((i, n) => $"{n + 1}. {i.Title}{(i.IsShown ? " (shown)" : string.Empty)}"))} · " +
             (Scrolls ? $"scrolls: rows {_first + 1}–{Mathf.Min(_items.Count, _first + RowsPerPage)} in view · " : string.Empty) +
             (_modes != null ? $"view {(_modes.Mode == ViewMode.Virtual ? "VR" : "MR")} · " : string.Empty) +
+            $"space {(ImmersiveXSession.Instance != null && ImmersiveXSession.Instance.CurrentSpace != null ? "saved" : "not saved")}{(_space != null && _space.IsShowing ? " (Space panel open)" : string.Empty)} · " +
             $"swipes recognised: {(_swipes != null ? _swipes.Count : 0)}";
 
         Transform Viewer() =>

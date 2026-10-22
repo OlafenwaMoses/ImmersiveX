@@ -57,6 +57,8 @@ namespace ImmersiveX
             modes._camera = session != null && session.Origin != null ? session.Origin.Camera : Camera.main;
             modes._world = VirtualWorld.Create(modes.transform, modes._camera != null ? modes._camera.transform : null);
             modes._guard = RoomGuard.Create(modes.transform);
+            if (session != null)
+                session.SpaceReady += _ => { if (modes != null && modes.Mode == ViewMode.Virtual) modes.EnterVirtual(); }; // a re-created room: its new walls
             return modes;
         }
 
@@ -98,19 +100,22 @@ namespace ImmersiveX
             // the virtual floor lies on the real one, its pool of light where content stands (as content finds them)
             var head = _camera != null ? _camera.transform : null;
             var floorHeight = RoomFloor.Height(head);
-            if (!RoomFloor.TryCentre(out var centre))
+            var here = RoomFloor.RoomIsHere(head); // the mapped room is the one the user is in (not another storey)
+            if (!here || !RoomFloor.TryCentre(out var centre))
                 centre = head != null ? head.position + Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized * 1.5f : Vector3.zero;
             centre.y = floorHeight;
             _world.Show(floorHeight, centre);
-            var floor = _session != null ? _session.FloorPose : Pose.identity;
-            if (_session == null || _session.Walkable == null)
-                floor = new Pose(new Vector3(0f, floorHeight, 0f), Quaternion.identity);
+            var floor = here ? _session.FloorPose : new Pose(new Vector3(0f, floorHeight, 0f), Quaternion.identity);
             var boxes = _session != null && _session.Origin != null ? _session.Origin.GetComponentInChildren<ARBoundingBoxManager>(true) : null;
             var furniture = new List<(Pose, Vector3)>();
             if (boxes != null)
                 foreach (var box in boxes.trackables)
-                    furniture.Add((new Pose(box.transform.position, box.transform.rotation), box.size));
-            _guard.Show(_session != null && _session.Walkable != null ? _session.CurrentSpace?.FloorPolygon : null, floor, _session != null ? _session.CeilingHeight : 0f, furniture);
+                {
+                    var y = box.transform.position.y - floorHeight;
+                    if (y > -0.3f && y < 2.5f) // on this floor, not another storey's
+                        furniture.Add((new Pose(box.transform.position, box.transform.rotation), box.size));
+                }
+            _guard.Show(here ? _session.CurrentSpace?.FloorPolygon : null, floor, here ? _session.CeilingHeight : 0f, furniture);
             ImmersiveXLog.Info($"View: VR · the real world is hidden; the virtual world's floor at {floorHeight:0.00} m around {centre:F2} · " +
                                $"the room shown near the user: {_guard.Walls} wall(s), {_guard.Furniture} piece(s) of furniture" +
                                (_guard.Furniture > 0 ? $" (at {string.Join(", ", _guard.FurnitureAt.ConvertAll(p => $"{p.x:0.0}, {p.z:0.0}"))})." : "."));

@@ -24,7 +24,7 @@ namespace ImmersiveX.Editor
     /// <item><c>invoke rescan|forget|showarea|saveanchor|loadanchor|eraseanchor|scandone|scanskip</c>: press a Device Check or scan button</item>
     /// <item><c>invoke vr|mr|view</c>: switch to VR or MR as the content menu's buttons do, or say which is on</item>
     /// <item><c>invoke reach</c>: what each hand and controller could grab from where it is now (rays only click) · <c>invoke uirays</c>: can a ray click every panel button</item>
-    /// <item><c>contentmenu status|open|close|toggle|select &lt;n&gt;|scroll up|down [rows]|device|swipe right|left|both</c> (or <c>cm …</c>): the content menu</item>
+    /// <item><c>contentmenu status|open|close|toggle|select &lt;n&gt;|scroll up|down [rows]|space|back|recreate|device|swipe right|left|both</c> (or <c>cm …</c>): the content menu</item>
     /// <item><c>prompt primary|secondary</c>: press a button on the ImmersiveX prompt that's showing</item>
     /// <item><c>turn &lt;degrees&gt; &lt;seconds&gt;</c>: turn the rig on the spot (Play mode) to test the guided look-around's coverage and coaching</item>
     /// <item>Commands other packages register with <see cref="RegisterCommand"/>, e.g. ImmersiveX Media's <c>media …</c> and <c>demo</c></item>
@@ -555,6 +555,9 @@ namespace ImmersiveX.Editor
                     menu.Panel.position = new Vector3(float.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture),
                         float.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture), float.Parse(parts[3], System.Globalization.CultureInfo.InvariantCulture));
                     break;
+                case "space": menu.OpenSpace(); note = $"Space panel: {menu.Space.Says}. "; break; // the footer's Space button
+                case "back": menu.BackFromSpace(); break;
+                case "recreate": menu.RecreateSpace(); break; // the Space panel's Re-create space
                 case "scroll": // "contentmenu scroll <up|down> [rows]": what the scroll buttons do
                     if (parts.Length < 2 || (parts[1] != "up" && parts[1] != "down"))
                         throw new ArgumentException("Usage: contentmenu scroll <up|down> [rows]");

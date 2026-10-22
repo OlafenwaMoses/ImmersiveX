@@ -25,12 +25,6 @@ namespace ImmersiveX.Media
         [InspectorName("4D mesh (.sp4m)")] Mesh4D,
     }
 
-    public enum MediaPlacement
-    {
-        RoomCentre,
-        InFrontOfUser,
-    }
-
     /// <summary>
     /// Plays any supported media in the user's room with one component: set <see cref="Source"/> and the format is
     /// detected and the right player attached, all with the same acrylic controls.
@@ -40,11 +34,12 @@ namespace ImmersiveX.Media
     /// meshes (<c>.obj .ply .stl</c>), frame sequences (a sequence <c>.json</c> or a folder of frames), video
     /// (<c>.mp4 .m4v .mov .webm</c>) and photos (<c>.jpg .png</c>): flat, 180° or 360°, mono or stereo; 4D meshes
     /// (<c>.sp4m</c>, <c>.sp4m.gz</c>: a scene baked over time, with its captions and callouts).</item>
-    /// <item>Standing media is fitted to <see cref="Height"/> with its feet on the floor, at the centre of the mapped room,
-    /// facing the user. Grab it with a hand or controller at it to slide it across the floor; it turns about the up axis
+    /// <item>Standing media is fitted to <see cref="Height"/> with its feet on the floor under the user, in front of them and
+    /// facing them, when the app starts and whenever it's picked in the content menu. Grab it with a hand or controller at it to slide it across the floor; it turns about the up axis
     /// only. The ray from a hand or controller only clicks (see <see cref="DirectGrabOnly"/>).</item>
-    /// <item>It moves only when the user moves it. Where it's put is kept with a spatial anchor (see
-    /// <see cref="ContentAnchor"/>), so it stays in the same real spot when the headset comes off and after a relaunch.</item>
+    /// <item>Then it moves only when the user moves it: it's held in place with a spatial anchor (see
+    /// <see cref="ContentAnchor"/>), so it stays in the same real spot through tracking corrections and the headset coming
+    /// off, until the next start or pick puts it in front of the user again.</item>
     /// <item>Flat video and photos are an upright screen; 180°/360° video and photos surround the user.</item>
     /// <item>It waits, paused, for the Play button unless <c>Play On Start</c> is set.</item>
     /// </list>
@@ -90,13 +85,10 @@ namespace ImmersiveX.Media
         [SerializeField, Min(0.2f), Tooltip("Height of a flat video screen in metres.")]
         float _screenHeight = 1f;
 
-        [SerializeField, Tooltip("Where it stands: the centre of the mapped room (in front of the user when there's no room), or in front of the user.")]
-        MediaPlacement _placement = MediaPlacement.RoomCentre;
-
-        [SerializeField, Min(0.5f), Tooltip("How far in front of the user it stands when it isn't at the room's centre, in metres.")]
+        [SerializeField, Min(0.5f), Tooltip("How far in front of the user it stands when the app starts or it's picked in the content menu, in metres.")]
         float _distanceFromUser = 2f;
 
-        [SerializeField, Min(-1), Tooltip("With several pieces of media: which spot this one takes until the user moves it. 0 is the centre, 1 and up stand around it. -1 = automatic (by order in the hierarchy).")]
+        [SerializeField, Min(-1), Tooltip("Without the content menu, with several pieces of media showing: which spot this one takes. 0 is in front of the user, 1 and up stand around it. -1 = automatic (by order in the hierarchy). With the content menu, the piece showing always takes the spot in front.")]
         int _spot = -1;
 
         [SerializeField, Tooltip("Which way is up in the file. Auto uses the format's usual convention.")]
@@ -140,7 +132,6 @@ namespace ImmersiveX.Media
         BoxCollider _collider;
         ContentAnchor _anchoring;
         bool _wantPlaying;
-        bool _placing;
         bool _placed;
         bool _lost;
         bool _resumeAfterPause;
@@ -359,7 +350,7 @@ namespace ImmersiveX.Media
             if (session != null && session.State != SessionState.Ready && session.State != SessionState.Failed)
                 session.StateChanged += OnSessionStateChanged;
             else
-                StartCoroutine(Place());
+                Place("the app started");
 
             yield return Load();
         }
@@ -448,7 +439,7 @@ namespace ImmersiveX.Media
         void OnSessionStateChanged(SessionState state)
         {
             if (state == SessionState.Ready || state == SessionState.Failed)
-                StartCoroutine(Place());
+                Place("the app started");
         }
 
         void OnDestroy()
@@ -599,6 +590,8 @@ namespace ImmersiveX.Media
             _hiddenByMenu = !shown;
             if (!shown)
                 Show(false);
+            else if (_placed)
+                Place("it was picked in the content menu"); // in front of the user again, on the floor they're on
         }
 
         void ApplyVolume() => _playable?.SetVolume(_muted ? 0f : _volume);
@@ -655,97 +648,49 @@ namespace ImmersiveX.Media
         }
 
         /// <summary>
-        /// Put it back where the user left it: at its spatial anchor, else where it was saved in the room. The first time,
-        /// stand it on the floor at the centre of the mapped room (or in front of the user when there's no room), facing
-        /// the user, and anchor it there.
+        /// Stand it in front of the user, on the floor under them, facing them: when the app starts and whenever it's picked
+        /// in the content menu (<paramref name="why"/> says which, for the log). It then stays there, anchored, until the user
+        /// moves it or the next start or pick. With the content menu the piece showing takes the spot in front; without it,
+        /// several pieces stand around that spot (<see cref="MediaLayout"/>). Saved anchors from earlier visits aren't used:
+        /// the room may be another one, on another floor.
         /// </summary>
-        IEnumerator Place()
+        void Place(string why)
         {
-            if (_placing || _placed || Viewer() == null)
-                yield break;
-            _placing = true;
-            RestoredPlacement restored = null;
-            var restoring = true;
-            _anchoring.Key = PlacementKey;
-            _anchoring.Restore(result =>
-            {
-                restored = result;
-                restoring = false;
-            });
-            while (restoring)
-                yield return null;
-            _placing = false;
-
             var head = Viewer();
             if (head == null)
-                yield break;
+                return;
             var user = UserRelativePlacement.UserPose(head);
             var floor = FloorHeight();
             var forward = user.rotation * Vector3.forward;
-            Vector3 position;
-            Quaternion rotation;
-            string where;
-            if (restored != null)
-            {
-                position = restored.Pose.position;
-                if (restored.FromAnchor)
-                    floor = position.y; // the anchor sits on the real floor
-                else
-                    position.y = floor;
-                rotation = restored.Pose.rotation;
-                if (restored.Size > 0f)
-                {
-                    _height = Mathf.Clamp(restored.Size, 0.3f, 4f);
-                    ApplySize();
-                }
+            var anchor = user.position + forward * _distanceFromUser;
+            anchor.y = floor;
 
-                where = restored.FromAnchor ? $"at its spatial anchor ({ContentAnchor.Short(_anchoring.SavedAnchorId)})" : "where it was left in the room";
-            }
-            else
-            {
-                Vector3 anchor;
-                if (_placement == MediaPlacement.RoomCentre && TryRoomCentre(out var centre))
-                {
-                    anchor = new Vector3(centre.x, floor, centre.z);
-                    where = $"at the centre of {ImmersiveXSession.Instance.CurrentSpace?.Name ?? "the room"}";
-                }
-                else
-                {
-                    anchor = user.position + forward * _distanceFromUser;
-                    anchor.y = floor;
-                    where = "in front of the user";
-                }
+            var slot = ContentMenu.Instance != null ? 0 : _spot >= 0 ? _spot : MediaLayout.Claim(this);
+            var towardUserFromAnchor = Vector3.ProjectOnPlane(user.position - anchor, Vector3.up);
+            towardUserFromAnchor = towardUserFromAnchor.sqrMagnitude > 0.09f ? towardUserFromAnchor.normalized : -forward;
+            var position = anchor + MediaLayout.Offset(slot, towardUserFromAnchor);
+            position.y = floor;
+            for (var pull = 0.9f; !IsWalkable(position) && pull > 0.2f; pull -= 0.1f)
+                position = anchor + MediaLayout.Offset(slot, towardUserFromAnchor) * pull;
+            for (var distance = _distanceFromUser; !IsWalkable(position) && distance > 0.8f; distance -= 0.1f)
+                position = new Vector3(user.position.x, floor, user.position.z) + forward * distance;
+            position.y = floor;
 
-                // Several pieces of media share the room: the first takes the spot, the rest stand around it.
-                var slot = _spot >= 0 ? _spot : MediaLayout.Claim(this);
-                var towardUserFromAnchor = Vector3.ProjectOnPlane(user.position - anchor, Vector3.up);
-                towardUserFromAnchor = towardUserFromAnchor.sqrMagnitude > 0.09f ? towardUserFromAnchor.normalized : -forward;
-                position = anchor + MediaLayout.Offset(slot, towardUserFromAnchor);
-                position.y = floor;
-                for (var pull = 0.9f; !IsWalkable(position) && pull > 0.2f; pull -= 0.1f)
-                    position = anchor + MediaLayout.Offset(slot, towardUserFromAnchor) * pull;
-                for (var distance = _distanceFromUser; !IsWalkable(position) && distance > 0.8f; distance -= 0.1f)
-                    position = new Vector3(user.position.x, floor, user.position.z) + forward * distance;
-                if (slot > 0)
-                    where += $" (spot {slot + 1})";
-
-                // Face the user; if they're standing on the spot, face them as if it were in front of them.
-                var towardUser = Vector3.ProjectOnPlane(user.position - position, Vector3.up);
-                towardUser = towardUser.sqrMagnitude > 0.09f ? towardUser.normalized : -forward;
-                rotation = Quaternion.LookRotation(-towardUser, Vector3.up);
-            }
-
-            transform.SetPositionAndRotation(position, rotation);
+            // Face the user; if they're standing on the spot, face them as if it were in front of them.
+            var towardUser = Vector3.ProjectOnPlane(user.position - position, Vector3.up);
+            towardUser = towardUser.sqrMagnitude > 0.09f ? towardUser.normalized : -forward;
+            transform.SetPositionAndRotation(position, Quaternion.LookRotation(-towardUser, Vector3.up));
             _grabber.FloorHeight = floor;
             _grabber.IsAllowed = IsWalkable;
             _grabber.ResetConstraint(position);
 
             _placed = true;
             PlaceControls();
-            ImmersiveXLog.Info($"Media: placed {where}, {Vector3.Distance(Flat(position), Flat(user.position)):0.0} m from the user, on the floor at {floor:0.00} m.");
-            if (restored == null || !restored.FromAnchor)
-                SavePlacement(); // anchor it here, so it's in this spot next time too
-            if (_wantPlaying && _playable != null && _playable.IsLoaded)
+            ImmersiveXLog.Info($"Media: {Name} placed in front of the user ({why}){(slot > 0 ? $", spot {slot + 1}" : string.Empty)}, " +
+                               $"{Vector3.Distance(Flat(position), Flat(user.position)):0.0} m away, facing them, on the floor at {floor:0.00} m " +
+                               $"({(RoomFloor.RoomIsHere(head) ? $"the floor of {ImmersiveXSession.Instance.CurrentSpace?.Name ?? "the mapped room"}" : "the floor under the user")}).");
+            SavePlacement(); // anchored here for this visit
+            if (_wantPlaying && _playable != null && _playable.IsLoaded && !_hiddenByMenu)
                 Play();
         }
 
@@ -803,14 +748,11 @@ namespace ImmersiveX.Media
         /// <summary>The floor under the user (see <see cref="RoomFloor.Height"/>).</summary>
         static float FloorHeight() => RoomFloor.Height(Viewer());
 
-        /// <summary>The middle of the mapped room's walkable area, in world space.</summary>
-        static bool TryRoomCentre(out Vector3 centre) => RoomFloor.TryCentre(out centre);
-
         static bool IsWalkable(Vector3 world)
         {
             var session = ImmersiveXSession.Instance;
-            if (session == null || session.Walkable == null)
-                return true;
+            if (session == null || session.Walkable == null || !RoomFloor.RoomIsHere(Viewer()))
+                return true; // no mapped room, or it's another room (another floor): nothing to keep inside
             var floor = session.FloorPose;
             var local = Quaternion.Inverse(floor.rotation) * (world - floor.position);
             return session.Walkable.Contains(new Vector2(local.x, local.z));

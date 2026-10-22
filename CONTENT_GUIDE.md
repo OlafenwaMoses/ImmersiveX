@@ -27,15 +27,15 @@ Every kind of content is placed the same way. Each section below adds what's spe
 
 1. **Add it to a scene in the build.** Media goes in as **Immersive Media** (Add Media, or the component by hand); your own Unity objects go in with **Make Immersive** (section 10). The first scene in **File ▸ Build Profiles** is the one the app opens. Save the scene.
 2. **Put it in order.** The content menu lists the scene's content in hierarchy order, top first: drag objects in the Hierarchy to reorder them (automation: `media first <name>`). With the menu on, one piece shows at a time: the first, until the user picks another (the app remembers the choice).
-3. **Choose where it first stands** (Immersive Media ▸ *Size and placement*):
-   - **Placement:** *Room Centre* (default): the centre of the mapped room, or in front of the user when no room is mapped. *In Front Of User*: **Distance From User** ahead (2 m by default).
+3. **Choose how it stands** (Immersive Media ▸ *Size and placement*). It always starts in front of the user, on the floor under them and facing them, when the app starts and whenever it's picked in the content menu:
+   - **Distance From User:** how far ahead (2 m by default).
    - **Height:** how tall standing content is, in metres (1.6 by default); its width follows. Flat video and photos use **Screen Height** (1 m) instead, and 360°/180° media surrounds the user.
    - **Up:** which way is up in the file, when it differs from the format's convention.
    - **Spot:** only when several pieces show at once (content menu off): 0 is the centre and 1 and up stand around it; −1 follows the hierarchy order.
    - Standing content stands on the floor and faces the user.
 4. **Choose how it plays** (*Playback*): **Play On Start** (off: it waits, paused, for Play), **Loop**, **Volume**, and **Frame Rate** for frame folders.
 5. **Choose what the user can do:** **Show Controls**, **Show Handles** and **Selectable Parts**.
-6. **Then the user places it.** It's anchored where it first stands. The user moves, turns and resizes it with its handles, or a hand, and it stays there through headset off/on and relaunches, held by a spatial anchor. Nothing moves it by itself after that.
+6. **Then the user places it.** It's anchored where it first stands. The user moves, turns and resizes it with its handles, or a hand, and it stays there through headset off/on, held by a spatial anchor. Nothing moves it by itself after that, until the next launch or pick in the content menu puts it in front of the user again.
 7. **Test it** in the Meta XR Simulator (**ImmersiveX ▸ Play Mode ▸ Meta XR Simulator (Quest)**, then Play): pick it from the content menu, play it, move it. Then build; the build's content check stops if anything is missing.
 
 ## At a glance
@@ -287,7 +287,7 @@ These formats can't load while the app runs, but Unity imports them in the edito
 
 **Placing it** (the **Immersive Content** component Make Immersive adds):
 - **Placement:** *In Front Of User* (default) puts it at **Offset From User** the first time: 0.8 m ahead and 15 cm below the eyes. *Keep Scene Position* starts it where it is in the scene.
-- Then the user moves it, and it stays where they leave it, held by a spatial anchor (its size too).
+- Then the user moves it, and it stays where they leave it, held by a spatial anchor (its size too), until the next launch or pick in the content menu puts it in front of them again.
 - It gets the handles and is listed in the content menu like media. **Selectable Parts** is off for Unity objects: turn it on when the object's meshes should be parts.
 
 To get Immersive Media's playback controls instead, export the model as GLB (for example from Blender) and add that.

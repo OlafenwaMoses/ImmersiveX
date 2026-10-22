@@ -47,6 +47,12 @@ namespace ImmersiveX
         /// <summary>The floor's pose this session.</summary>
         public Pose FloorPose => _room?.FloorPose ?? Pose.identity;
 
+        /// <summary>True while the room is being mapped (at start, or re-created from the content menu).</summary>
+        public bool IsMappingRoom => _room != null && _room.IsBusy;
+
+        /// <summary>True when <see cref="RescanRoom"/> would map the room again now.</summary>
+        public bool CanRescanRoom => State == SessionState.Ready && _room != null && !_room.IsBusy;
+
         /// <summary>The room's floor-to-ceiling height from its last scan, or 0 when it isn't known.</summary>
         public float CeilingHeight => _room?.LastRoom != null ? _room.LastRoom.CeilingHeight : 0f;
 

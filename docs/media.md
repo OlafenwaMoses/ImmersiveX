@@ -5,7 +5,7 @@
 2. attaches the right player;
 3. shows the same acrylic media controls and side handles whatever the format.
 
-A scene can hold as many as you like. Each has its own controls, and each stays where the user put it, held there by a spatial anchor.
+A scene can hold as many as you like. Each has its own controls; each starts in front of the user and then stays where the user puts it, held there by a spatial anchor.
 
 ## Adding content (no code)
 **ImmersiveX ▸ Media ▸ Add Media…** takes a file, a folder of frames or a URL, and adds it to the open scene as Immersive Media:
@@ -67,10 +67,9 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
 - **Proprietary volumetric formats:** see [Vendor formats](#vendor-formats).
 
 ## Where it stands
-- **The first media in the scene hierarchy** stands at the **centre of the mapped room**; the others stand around it. With no mapped room, as in the editor simulators, the group centres 2 m in front of the user.
-  - **Placement:** *Room Centre* (default) or *In Front Of User*, at **Distance From User** (2 m).
-  - Set **Spot** to choose: 0 is the centre and 1 and up stand around it.
-  - **With the content menu on** (the default), one piece shows at a time, and the menu lists them in hierarchy order. See [CONTENT_GUIDE.md](../CONTENT_GUIDE.md#placing-content-in-the-app) for placing each kind of content.
+- **In front of the user, on the floor under them, facing them:** when the app starts and whenever it's picked in the content menu, at **Distance From User** (2 m). The floor is the one the user is standing on: a mapped room counts only when its floor is under them (0.4 to 2.3 m below their eyes), so a room mapped on another storey is ignored, and so is its outline when keeping content inside the room.
+  - **With the content menu on** (the default), one piece shows at a time and takes that spot, and the menu lists them in hierarchy order.
+  - With the menu off and several pieces showing, the first stands in front and the others around it; set **Spot** to choose (0 is in front, 1 and up stand around it). See [CONTENT_GUIDE.md](../CONTENT_GUIDE.md#placing-content-in-the-app) for placing each kind of content.
 - **Standing media** is fitted to **Height** (1.60 m by default) with its feet on the floor, facing the user. Add Media sets Height to a packed capture's real size.
 - **Hologram streams** are fitted frame by frame and jump at camera cuts. A stream with a `fit` in its `stream.json` keeps that one fit for the whole clip, so a character keeps its size when it raises an arm.
 - **Sequences** keep the first frame's scale, so a performer can move.
@@ -80,9 +79,9 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
 - **Far background:** a splat scan's distant background (a sky shell far outside the scene) is left out, so the capture stands in the room. It keeps everything within three times the distance of its nearest 90 % of splats.
 - **Scene-scale captures** (a room, a plaza) are fitted to Height like any other standing media, so they show as a diorama. Resize them with the corner handle.
 - **It moves only when the user moves it, and it stays where it's put:**
-  - The first time, it's anchored where it's placed.
-  - When the user lets go after moving, turning or resizing it, it's anchored again half a second later. The anchor is saved on the device, and the old one is erased.
-  - Next launch, it comes back at its **spatial anchor**: the same real-world spot, even if the headset re-centred.
+  - It's anchored where it's placed (in front of the user at start and on each pick).
+  - When the user lets go after moving, turning or resizing it, it's anchored again half a second later, and the old anchor is erased.
+  - The next launch, or picking it again in the menu, puts it in front of the user again: earlier anchors aren't restored, since the user may be in another room.
   - While the app runs, it **follows its anchor**. When the headset is taken off and put back on, or tracking is corrected, it stays in the same real spot. Until the device finds the anchor again, it's hidden rather than shown in the wrong place.
   - **Fallback:** its place is also saved relative to the recognised room, or to the tracking space when no room is mapped. That's used when the anchor can't be loaded, and on platforms that can't save anchors (XR Simulation).
   - "Forget room" forgets those places and erases their anchors.
@@ -102,7 +101,7 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
 - **Grab the media itself** with a hand or controller at it: one hand slides it and a wrist twist turns it; two hands turn it like a wheel. A controller's ray only clicks and drags handles; it never picks content up.
 - **Hands have no pointer:** tracked hands press buttons with a finger and pinch or grab what's within reach. Controllers in hand keep their rays (Settings ▸ Hand Pointers gives hands rays too).
 - **Parts:** models with two or more meshes, web scenes and 4D meshes have selectable parts. A ray click selects a part (click again for the whole), a hand picks it up, and its label's **Put back** returns it. Parts move only while the media is paused. Turn it off with **Selectable Parts**.
-- **Content menu:** lists every piece of content in the scene and shows one at a time (the choice is remembered), with **Quest menu** and **Close app**. It opens in front of the user when the app starts; after that a quick sideways swipe of either hand opens it: towards the middle of the body (right hand right to left, left hand left to right); the reverse closes it. With more than six pieces, up and down buttons on the right of the list scroll it a row a click. See the [README](../README.md#in-the-headset) for the picture. Turn it off in Settings ▸ Content Menu.
+- **Content menu:** lists every piece of content in the scene and shows one at a time (the choice is remembered), with **Quest menu** and **Close app**. It opens in front of the user when the app starts; after that a quick sideways swipe of either hand opens it: towards the middle of the body (right hand right to left, left hand left to right); the reverse closes it. With more than six pieces, up and down buttons on the right of the list scroll it a row a click. **Space** (in its footer, a green dot when the room is saved) shows what's saved about the room, with **Re-create space** to map it again (Space Setup on Quest) or **Back** to the menu. See the [README](../README.md#in-the-headset) for the picture. Turn it off in Settings ▸ Content Menu.
 - **MR and VR** (the content menu's header, MR at every start): **MR** shows the real room with content standing in it. **VR** hides the real room and puts the user in a quiet, low-lit virtual world (a night sky with faint stars over a dark floor at the real floor's height) where any content stands out. Content keeps its place in the real room either way, the Quest's boundary comes back in VR, and the real walls and furniture show as a soft grid when the user comes within about a metre of them.
 
 It waits, paused, for Play unless **Play On Start** is set. With **Loop** off, it stops at the end and Play starts it again.
