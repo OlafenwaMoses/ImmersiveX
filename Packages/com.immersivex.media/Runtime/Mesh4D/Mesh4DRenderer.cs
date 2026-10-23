@@ -11,6 +11,8 @@ namespace ImmersiveX.Media
     /// two atlas textures painted from the colour keyframes around the current time; and the effect Gaussians through the
     /// splat renderer ImmersiveX already has. Everything lives under <see cref="Root"/>, whose transform takes the content's
     /// coordinates (three.js: right-handed, y up, metres) into the room.
+    /// <para>A hologram container (version 4) has no colours: its one mesh draws with the hologram material, which adds
+    /// each object's light computed per pixel (rim, contour lines, scan band, materialise front) over the room.</para>
     /// </summary>
     sealed class Mesh4DRenderer : IDisposable
     {
@@ -35,6 +37,19 @@ namespace ImmersiveX.Media
         static readonly int ProbesId = Shader.PropertyToID("_Probes");
         static readonly int WidthId = Shader.PropertyToID("_Width");
         static readonly int HeightId = Shader.PropertyToID("_Height");
+        static readonly int DissolveSphereId = Shader.PropertyToID("_DissolveSphere");
+        static readonly int DissolveNoiseId = Shader.PropertyToID("_DissolveNoise");
+        static readonly int FocusId = Shader.PropertyToID("_Focus");
+        static readonly int HoloTimeId = Shader.PropertyToID("_HoloTime");
+        static readonly int HoloFadeId = Shader.PropertyToID("_HoloFade");
+        static readonly int HoloGainId = Shader.PropertyToID("_HoloGain");
+        static readonly int[] HoloIds = { Shader.PropertyToID("_Holo0"), Shader.PropertyToID("_Holo1"), Shader.PropertyToID("_Holo2"), Shader.PropertyToID("_Holo3") };
+
+        /// <summary>Table rows per object: 3 matrix columns, (visible, highlight, flags, side), (first probe, flip, hull
+        /// radius, own cut level), then its own cutaway: (type, a), (ref, p0), (p1, glow width, -, -). A hologram uses
+        /// rows 5 and 6 for (hue, contour spacing) and (height span, gains), and the level in row 4 is how far it has
+        /// materialised.</summary>
+        public const int Stride = 8;
 
         readonly Mesh4DContainer _c;
         readonly int _objects;
@@ -49,10 +64,14 @@ namespace ImmersiveX.Media
         readonly Material _material; // atlas objects that take part in a rule (cutaway, door, dissolve): they discard
         readonly Material _plainMaterial; // every other atlas object: no discard, so early depth rejection works
         readonly Material _perVertexMaterial;
+        readonly Material _perVertexRulesMaterial; // per-vertex objects that take part in a rule
         readonly Material _paint;
+        readonly Material _hologramMaterial;
+        readonly Mesh _hologramMesh;
         readonly Mesh _atlasMesh;
         readonly Mesh _plainMesh;
         readonly Mesh _vertexMesh;
+        readonly Mesh _vertexRulesMesh;
         readonly GameObject[] _renderers;
         HologramRenderer _effects;
         readonly uint[] _effectData;
@@ -79,24 +98,57 @@ namespace ImmersiveX.Media
         public int VisibleTriangles { get; private set; }
         public int EffectCount => _effectCount;
 
-        public Mesh4DRenderer(Mesh4DContainer container, Transform parent, Material material, Material paint, Material splats)
+        public Mesh4DRenderer(Mesh4DContainer container, Transform parent, Material material, Material paint, Material splats, Material hologram = null)
         {
             _c = container;
             _objects = container.ObjectCount;
             Matrices = new float[_objects * 12];
             Visible = new bool[_objects];
-            _table = new Vector4[_objects * 5];
-            _tableBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _objects * 5, 16);
+            _table = new Vector4[_objects * Stride];
+            _tableBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _objects * Stride, 16);
+            for (var o = 0; o < _objects; o++)
+            {
+                var info = container.Objects[o];
+                if (container.IsHologram)
+                {
+                    _table[o * Stride + 5] = new Vector4(info.Hue.r, info.Hue.g, info.Hue.b, Mathf.Max(1e-4f, info.LineSpacing));
+                    _table[o * Stride + 6] = new Vector4(info.Span.x, info.Span.y, info.Gain.x, info.Gain.y);
+                    continue;
+                }
+
+                _table[o * Stride + 5] = new Vector4(info.CutType, info.CutA.x, info.CutA.y, info.CutA.z);
+                _table[o * Stride + 6] = new Vector4(info.CutRef.x, info.CutRef.y, info.CutRef.z, info.CutP0);
+                _table[o * Stride + 7] = new Vector4(info.CutP1, Mathf.Max(1e-4f, info.CutGlowWidth), 0f, 0f);
+            }
 
             Root = new GameObject("4D Scene").transform;
             Root.SetParent(parent, false);
             Root.gameObject.layer = parent.gameObject.layer;
+
+            if (container.IsHologram)
+            {
+                if (hologram == null)
+                    throw new InvalidOperationException("The hologram material is missing.");
+                _hologramMaterial = new Material(hologram) { name = "Mesh 4D (hologram)" };
+                _hologramMaterial.SetBuffer(ObjectsId, _tableBuffer);
+                _hologramMaterial.SetFloat(GroundId, container.Ground);
+                _hologramMaterial.SetFloat(HoloGainId, container.HoloGain);
+                for (var k = 0; k < 4; k++)
+                    _hologramMaterial.SetVector(HoloIds[k], container.Holo[k]);
+                _hologramMesh = BuildHologramMesh(container);
+                _renderers = new[] { Renderer("Hologram meshes", _hologramMesh, _hologramMaterial) };
+                SetUpEffects(container, splats, out _effects, out _effectData, out _effectPositions, out _keys, out _order);
+                return;
+            }
 
             _material = new Material(material) { name = "Mesh 4D (atlas, rules)" };
             _material.EnableKeyword("MESH4D_RULES");
             _plainMaterial = new Material(material) { name = "Mesh 4D (atlas)" };
             _perVertexMaterial = new Material(material) { name = "Mesh 4D (per vertex)" };
             _perVertexMaterial.EnableKeyword("MESH4D_PER_VERTEX");
+            _perVertexRulesMaterial = new Material(material) { name = "Mesh 4D (per vertex, rules)" };
+            _perVertexRulesMaterial.EnableKeyword("MESH4D_PER_VERTEX");
+            _perVertexRulesMaterial.EnableKeyword("MESH4D_RULES");
             _paint = new Material(paint) { name = "Mesh 4D Paint" };
 
             // texel → probe map
@@ -135,6 +187,9 @@ namespace ImmersiveX.Media
                 m.SetColor(CutGlowId, container.CutGlow);
                 m.SetColor(DissolveGlowId, container.DissolveGlow);
                 m.SetFloat(GroundId, container.Ground); // like every standing media: nothing shows below the floor
+                m.SetFloat(DissolveSphereId, container.DissolveSphere ? 1f : 0f);
+                m.SetVector(DissolveNoiseId, new Vector4(container.DissolveNoiseScale, container.DissolveNoiseAmplitude, container.DissolveGlowWidth, container.DissolveCentreY));
+                m.SetVector(FocusId, Vector4.zero);
             }
 
             _paint.SetBuffer(MapId, _map);
@@ -144,25 +199,65 @@ namespace ImmersiveX.Media
             _atlasMesh = BuildAtlasMesh(container, rules: true);
             _plainMesh = BuildAtlasMesh(container, rules: false);
             ReleaseAtlasArrays(container);
-            _vertexMesh = BuildPerVertexMesh(container);
+            _vertexMesh = BuildPerVertexMesh(container, rules: false);
+            _vertexRulesMesh = BuildPerVertexMesh(container, rules: true);
             _renderers = new[]
             {
                 _atlasMesh != null ? Renderer("Atlas meshes (cut, door, dissolve)", _atlasMesh, _material) : null,
                 _plainMesh != null ? Renderer("Atlas meshes", _plainMesh, _plainMaterial) : null,
-                _vertexMesh != null ? Renderer("Repeated meshes", _vertexMesh, _perVertexMaterial) : null,
+                _vertexMesh != null ? Renderer("Per-vertex meshes", _vertexMesh, _perVertexMaterial) : null,
+                _vertexRulesMesh != null ? Renderer("Per-vertex meshes (cut, dissolve)", _vertexRulesMesh, _perVertexRulesMaterial) : null,
             };
 
-            if (container.HasEffects)
+            SetUpEffects(container, splats, out _effects, out _effectData, out _effectPositions, out _keys, out _order);
+        }
+
+        void SetUpEffects(Mesh4DContainer container, Material splats, out HologramRenderer effects, out uint[] data, out float[] positions, out int[] keys, out uint[] order)
+        {
+            effects = null;
+            data = null;
+            positions = null;
+            keys = null;
+            order = null;
+            if (!container.HasEffects)
+                return;
+            var most = Mathf.Max(1, container.MaxEffectGaussians());
+            var rows = (most + SplatPacker.TextureWidth - 1) / SplatPacker.TextureWidth;
+            data = new uint[HologramFrame.ExpectedBytes(rows, SplatPacker.TextureWidth) / 4];
+            effects = new HologramRenderer(Root, splats, most, data.Length, container.SigmaLogRange);
+            effects.Transform.gameObject.layer = Root.gameObject.layer;
+            positions = new float[most * 3];
+            keys = new int[most];
+            order = new uint[most];
+        }
+
+        /// <summary>A hologram's triangles as one mesh: positions, normals and each vertex's object index.</summary>
+        static Mesh BuildHologramMesh(Mesh4DContainer c)
+        {
+            var count = c.MeshObjects.Length;
+            var positions = new Vector3[count];
+            var normals = new Vector3[count];
+            var objects = new Vector2[count];
+            for (var v = 0; v < count; v++)
             {
-                var most = Mathf.Max(1, container.MaxEffectGaussians());
-                var rows = (most + SplatPacker.TextureWidth - 1) / SplatPacker.TextureWidth;
-                _effectData = new uint[HologramFrame.ExpectedBytes(rows, SplatPacker.TextureWidth) / 4];
-                _effects = new HologramRenderer(Root, splats, most, _effectData.Length, container.SigmaLogRange);
-                _effects.Transform.gameObject.layer = Root.gameObject.layer;
-                _effectPositions = new float[most * 3];
-                _keys = new int[most];
-                _order = new uint[most];
+                positions[v] = new Vector3(c.MeshPositions[v * 3], c.MeshPositions[v * 3 + 1], c.MeshPositions[v * 3 + 2]);
+                normals[v] = new Vector3(c.MeshNormals[v * 3], c.MeshNormals[v * 3 + 1], c.MeshNormals[v * 3 + 2]) / 32767f;
+                objects[v] = new Vector2(c.MeshObjects[v], 0f);
             }
+
+            var mesh = new Mesh { name = "Mesh 4D hologram", indexFormat = IndexFormat.UInt32 };
+            mesh.SetVertices(positions);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(1, objects);
+            var indices = new int[c.MeshIndices.Length];
+            Buffer.BlockCopy(c.MeshIndices, 0, indices, 0, indices.Length * 4);
+            mesh.SetIndices(indices, MeshTopology.Triangles, 0, false);
+            mesh.bounds = new Bounds(Vector3.zero, Vector3.one * 400000f); // posed in the shader
+            c.MeshPositions = null;
+            c.MeshNormals = null;
+            c.MeshObjects = null;
+            c.MeshIndices = null;
+            return mesh;
         }
 
         GameObject Renderer(string name, Mesh mesh, Material material)
@@ -180,8 +275,9 @@ namespace ImmersiveX.Media
             return go;
         }
 
-        /// <summary>Objects with a per-pixel rule (cutaway 1, door 2, dissolve 4) need the discarding variant.</summary>
-        static bool HasRule(Mesh4DContainer.ObjectInfo o) => (o.Flags & 7) != 0;
+        /// <summary>Objects with a per-pixel rule (cutaway 1, door 2, dissolve 4, part of the set 16: it dissolves when the
+        /// stage follows its subject away, own cutaway 64) need the discarding variant.</summary>
+        static bool HasRule(Mesh4DContainer.ObjectInfo o) => (o.Flags & (1 | 2 | 4 | 16 | 64)) != 0;
 
         /// <summary>The atlas objects with rules (<paramref name="rules"/>) or without, as one mesh (or null when there are none).</summary>
         static Mesh BuildAtlasMesh(Mesh4DContainer c, bool rules)
@@ -226,18 +322,22 @@ namespace ImmersiveX.Media
             c.AtlasIndices = null;
         }
 
-        Material[] Materials => new[] { _material, _plainMaterial, _perVertexMaterial };
+        Material[] Materials => _hologramMaterial != null ? new[] { _hologramMaterial } : new[] { _material, _plainMaterial, _perVertexMaterial, _perVertexRulesMaterial };
 
-        /// <summary>Every member of every family (engines), merged into one mesh with its object index and probe weights.</summary>
-        static Mesh BuildPerVertexMesh(Mesh4DContainer c)
+        /// <summary>The members of every family (engines, or every object of a scene coloured per vertex) with a rule
+        /// (<paramref name="rules"/>) or without, merged into one mesh with their object index and probe weights.</summary>
+        static Mesh BuildPerVertexMesh(Mesh4DContainer c, bool rules)
         {
             var vertices = 0;
             var indices = 0;
             foreach (var f in c.Families)
-            {
-                vertices += f.Vertices * f.Members.Length;
-                indices += f.Indices.Length * f.Members.Length;
-            }
+                foreach (var member in f.Members)
+                {
+                    if (HasRule(c.Objects[member]) != rules)
+                        continue;
+                    vertices += f.Vertices;
+                    indices += f.Indices.Length;
+                }
 
             if (vertices == 0)
                 return null;
@@ -253,6 +353,8 @@ namespace ImmersiveX.Media
             {
                 foreach (var member in f.Members)
                 {
+                    if (HasRule(c.Objects[member]) != rules)
+                        continue;
                     var start = v;
                     for (var i = 0; i < f.Vertices; i++, v++)
                     {
@@ -269,7 +371,7 @@ namespace ImmersiveX.Media
                 }
             }
 
-            var mesh = new Mesh { name = "Mesh 4D repeated meshes", indexFormat = IndexFormat.UInt32 };
+            var mesh = new Mesh { name = rules ? "Mesh 4D per-vertex meshes (rules)" : "Mesh 4D per-vertex meshes", indexFormat = IndexFormat.UInt32 };
             mesh.SetVertices(positions);
             mesh.SetUVs(1, objects);
             mesh.SetUVs(2, pf);
@@ -316,8 +418,16 @@ namespace ImmersiveX.Media
                     for (var k = 0; k < 12; k++)
                         Matrices[o * 12 + k] = m[m0 + k] + (m[m1 + k] - m[m0 + k]) * a;
                 var h = Mathf.Lerp(c.Highlights[f0 * _objects + o], c.Highlights[f1 * _objects + o], a) / 255f;
-                _table[o * 5 + 3] = new Vector4(Visible[o] ? 1f : 0f, h, c.Objects[o].Flags, c.Objects[o].Side);
-                _table[o * 5 + 4] = new Vector4(c.Objects[o].ProbeStart, c.Objects[o].Flip ? 1f : 0f, c.Objects[o].HullRadius, 0f);
+                var cut = c.CutLevels != null ? Mathf.Lerp(c.CutLevels[f0 * _objects + o], c.CutLevels[f1 * _objects + o], a) / 255f : 0f;
+                _table[o * Stride + 3] = new Vector4(Visible[o] ? 1f : 0f, h, c.Objects[o].Flags, c.Objects[o].Side);
+                _table[o * Stride + 4] = new Vector4(c.Objects[o].ProbeStart, c.Objects[o].Flip ? 1f : 0f, c.Objects[o].HullRadius, cut);
+            }
+
+            if (_hologramMaterial != null)
+            {
+                _hologramMaterial.SetFloat(HoloTimeId, (float)seconds);
+                _hologramMaterial.SetFloat(HoloFadeId, Floats[7]);
+                return;
             }
 
             foreach (var material in Materials)
@@ -350,9 +460,9 @@ namespace ImmersiveX.Media
                 var extra = offset?.Invoke(o);
                 if (extra.HasValue)
                     m = extra.Value * m;
-                _table[o * 5] = new Vector4(m.m00, m.m10, m.m20, m.m03);
-                _table[o * 5 + 1] = new Vector4(m.m01, m.m11, m.m21, m.m13);
-                _table[o * 5 + 2] = new Vector4(m.m02, m.m12, m.m22, m.m23);
+                _table[o * Stride] = new Vector4(m.m00, m.m10, m.m20, m.m03);
+                _table[o * Stride + 1] = new Vector4(m.m01, m.m11, m.m21, m.m13);
+                _table[o * Stride + 2] = new Vector4(m.m02, m.m12, m.m22, m.m23);
                 if (Visible[o])
                     tris += TrianglesOf(o);
             }
@@ -364,9 +474,25 @@ namespace ImmersiveX.Media
         int TrianglesOf(int o)
         {
             var info = _c.Objects[o];
+            if (info.MeshRange != null)
+                return info.MeshRange[3] / 3;
             if (info.AtlasRange != null)
                 return info.AtlasRange[3] / 3;
             return info.Family >= 0 ? _c.Families[info.Family].Triangles : 0;
+        }
+
+        /// <summary>
+        /// While the stage follows its subject: the set dissolves beyond <paramref name="radius"/> of the subject at
+        /// (<paramref name="centre"/>.x, <paramref name="centre"/>.y) in content space, and the floor is at
+        /// <paramref name="ground"/>. A radius of 0 turns it off.
+        /// </summary>
+        public void Focus(Vector2 centre, float radius, float ground)
+        {
+            foreach (var material in Materials)
+            {
+                material.SetVector(FocusId, new Vector4(centre.x, centre.y, radius, Mathf.Max(0.05f, radius * 0.08f)));
+                material.SetFloat(GroundId, ground);
+            }
         }
 
         /// <summary>The object's current pose in content space.</summary>
@@ -383,9 +509,7 @@ namespace ImmersiveX.Media
         void PaintKeys(double seconds)
         {
             var c = _c;
-            var kx = Mathf.Clamp((float)(seconds * c.ColorRate), 0f, c.ColorKeys - 1);
-            var k0 = (int)kx;
-            var k1 = Mathf.Min(c.ColorKeys - 1, k0 + 1);
+            c.KeyAt(seconds, out var k0, out var k1, out var keyMix);
             // keep whichever slot already holds a keyframe we need
             int a = _atlasKey[0] == k0 ? 0 : _atlasKey[1] == k0 ? 1 : (_atlasKey[0] == k1 ? 1 : 0);
             var b = 1 - a;
@@ -400,20 +524,19 @@ namespace ImmersiveX.Media
                 material.SetTexture(AtlasBId, _atlas[bSlot]);
                 material.SetTexture(ProbesAId, _probes[a]);
                 material.SetTexture(ProbesBId, _probes[bSlot]);
-                material.SetFloat(KeyMixId, kx - k0);
+                material.SetFloat(KeyMixId, keyMix);
             }
         }
 
         void Paint(int slot, int key)
         {
             var c = _c;
-            var stride = c.Probes * 3;
-            var source = key * stride;
+            var rgb = c.ColorKey(key);
             for (int i = 0, o = 0; i < c.Probes; i++, o += 4)
             {
-                _rgba[o] = c.Colors[source + i * 3];
-                _rgba[o + 1] = c.Colors[source + i * 3 + 1];
-                _rgba[o + 2] = c.Colors[source + i * 3 + 2];
+                _rgba[o] = rgb[i * 3];
+                _rgba[o + 1] = rgb[i * 3 + 1];
+                _rgba[o + 2] = rgb[i * 3 + 2];
                 _rgba[o + 3] = 255;
             }
 
@@ -527,10 +650,13 @@ namespace ImmersiveX.Media
                 UnityEngine.Object.Destroy(_plainMesh);
             if (_vertexMesh != null)
                 UnityEngine.Object.Destroy(_vertexMesh);
-            UnityEngine.Object.Destroy(_material);
-            UnityEngine.Object.Destroy(_plainMaterial);
-            UnityEngine.Object.Destroy(_perVertexMaterial);
-            UnityEngine.Object.Destroy(_paint);
+            if (_vertexRulesMesh != null)
+                UnityEngine.Object.Destroy(_vertexRulesMesh);
+            if (_hologramMesh != null)
+                UnityEngine.Object.Destroy(_hologramMesh);
+            foreach (var m in new[] { _material, _plainMaterial, _perVertexMaterial, _perVertexRulesMaterial, _paint, _hologramMaterial })
+                if (m != null)
+                    UnityEngine.Object.Destroy(m);
             if (Root != null)
                 UnityEngine.Object.Destroy(Root.gameObject);
         }

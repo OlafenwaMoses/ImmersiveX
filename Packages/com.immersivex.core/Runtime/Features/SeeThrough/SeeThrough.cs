@@ -32,6 +32,25 @@ namespace ImmersiveX
             }
         }
 
+        /// <summary>
+        /// Hide the real world (VR mode, see <see cref="ViewModes"/>): the passthrough and any camera feed off, the camera
+        /// clearing to <paramref name="background"/>. <see cref="Apply"/> brings the real world back.
+        /// </summary>
+        public static void Remove(Camera camera, Color background)
+        {
+            Disable<ARCameraBackground>(camera.gameObject);
+            Disable<ARCameraManager>(camera.gameObject);
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = background;
+        }
+
+        static void Disable<T>(GameObject target) where T : Behaviour
+        {
+            var component = target.GetComponent<T>();
+            if (component != null)
+                component.enabled = false;
+        }
+
         static void ClearToTransparent(Camera camera)
         {
             camera.clearFlags = CameraClearFlags.SolidColor;

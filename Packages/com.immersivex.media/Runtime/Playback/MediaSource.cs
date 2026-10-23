@@ -80,6 +80,52 @@ namespace ImmersiveX.Media
             return true;
         }
 
+        /// <summary>The local file a file URL points to, when it is one (StreamingAssets in the editor and on desktop).</summary>
+        public static bool TryLocalFile(string url, out string path)
+        {
+            path = null;
+            if (!url.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+                return false;
+            var local = new Uri(url).LocalPath;
+            if (!File.Exists(local))
+                return false;
+            path = local;
+            return true;
+        }
+
+        /// <summary>
+        /// Download <paramref name="url"/> straight to <paramref name="path"/> without holding it in memory (large files out of
+        /// an Android APK); <paramref name="done"/> gets null, or the error. A partial file is removed.
+        /// </summary>
+        public static IEnumerator FetchToFile(string url, string path, Action<string> done, Action<float> progress = null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var partial = path + ".part";
+            using (var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbGET, new DownloadHandlerFile(partial) { removeFileOnAbort = true }, null))
+            {
+                request.timeout = 600;
+                var operation = request.SendWebRequest();
+                while (!operation.isDone)
+                {
+                    progress?.Invoke(request.downloadProgress);
+                    yield return null;
+                }
+
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    if (File.Exists(partial))
+                        File.Delete(partial);
+                    done($"{request.error} ({FileName(url)})");
+                    yield break;
+                }
+            }
+
+            if (File.Exists(path))
+                File.Delete(path);
+            File.Move(partial, path);
+            done(null);
+        }
+
         /// <summary>Download <paramref name="url"/>; <paramref name="done"/> gets the bytes, or null and the error.</summary>
         public static IEnumerator Fetch(string url, Action<byte[], string> done, Action<float> progress = null)
         {

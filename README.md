@@ -20,7 +20,7 @@ All of it runs from one codebase.
 > - **Done and checked on a Quest 3:**
 >   - M0 (foundation) and M1 ("Hello Hologram"): passthrough, no boundary, Space Setup, grabbing with hands and controllers.
 >   - Rooms mapped through Space Setup and saved automatically.
->   - Content held in place by spatial anchors through headset off/on and relaunches.
+>   - Content placed in front of you at launch and on each pick, then held in place by spatial anchors through headset off/on.
 >   - Immersive media (streamed holograms, 4D Gaussian splats and 4D meshes, with their sound) and the content menu.
 > - **In progress:**
 >   - The last device checks of M2 (room mapping) and M3 (anchors).
@@ -34,7 +34,7 @@ All of it runs from one codebase.
 |---|---|---|---|
 | F1 | See-through view | Mixed/augmented reality on every device except VR-only headsets | Working on Quest |
 | F2 | Automatic room mapping | Known rooms load with no prompt; a new room is mapped (Quest Space Setup, or a guided 360° look-around and floor pass) and saved; no boundary drawing | Working on Quest |
-| F3 | Persistent anchors | Content stays where you left it after the headset comes off or the app restarts | Working on Quest |
+| F3 | Anchors | Content starts in front of you on the floor you're on, then stays where you leave it through the headset coming off | Working on Quest |
 | F4 | Hands and controllers | A controller's ray clicks and drags handles; a hand or controller at the content picks it up | Working on Quest |
 | F5 | Motion restrictions | Allow rotation around any combination of X, Y and Z per object | Planned (M4) |
 | F6 | Immersive media | One component plays any supported format (below), with the same controls and handles for all | Working; device checks ongoing |
@@ -65,7 +65,7 @@ Add content with **ImmersiveX ▸ Media ▸ Add Media…** (a file, a folder or 
 ### In the headset
 - **Controls:** every piece of content gets play/pause, seek, time and sound controls, plus handles to move, turn (bars and a ring) and resize it.
 - **Parts:** models, web scenes and 4D meshes have selectable parts. A ray click selects a part, a hand picks it up, and **Put back** returns it.
-- **Content menu:** every piece of content in the scene, one shown at a time (the choice is remembered), plus **Quest menu** and **Close app**. Open and close it with a quick sideways swipe of either hand (or controller):
+- **Content menu:** every piece of content in the scene, one shown at a time (the choice is remembered), plus **Quest menu** and **Close app**, and **MR / VR** buttons in its header: MR shows your room, VR puts the content in a dim virtual world (your real walls and furniture glow faintly when you come close). It opens in front of you when the app starts; with more than six pieces it scrolls with the up and down buttons beside the list. **Space** shows whether your room is saved and can re-create it. Open and close it with a quick sideways swipe of either hand (or controller):
   - **Open:** swipe towards the middle of your body: the right hand from right to left, or the left hand from left to right.
   - **Close:** the reverse: the right hand from left to right, or the left hand from right to left.
   - A swipe is about 22 cm in under 0.3 s, in front of you between chest and forehead. Both hands at once (a clap) doesn't count, and the hand's way back after a swipe is ignored. Swiping again while the menu is elsewhere brings it to you.

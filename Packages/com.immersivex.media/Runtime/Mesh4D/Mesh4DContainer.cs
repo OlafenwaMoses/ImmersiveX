@@ -12,9 +12,16 @@ namespace ImmersiveX.Media
     /// scene's own triangles object by object, every object's pose 30 times a second, colour probes on every surface shaded
     /// twice a second (painted through a texture atlas, or blended per vertex for repeated fine meshes), the per-pixel rules
     /// the scene applies (a cutaway wedge, a door, a dissolving set, highlights), soft effects as Gaussians per frame,
-    /// captions and callouts. The layout is version 2 of the format the GenXR 4D pipeline writes:
-    /// <c>'SP4M'</c>, a version, a JSON header, then 4-byte-aligned binary sections named in the header.
-    /// Coordinates are three.js's: right-handed, y up, metres.
+    /// captions and callouts. The layout is the format the GenXR 4D pipeline writes: <c>'SP4M'</c>, a version, a JSON
+    /// header, then 4-byte-aligned binary sections named in the header. Coordinates are three.js's: right-handed, y up,
+    /// metres.
+    /// <para>Version 3 adds, for scenes coloured per vertex: each object's own cutaway (a plane or a wedge in its frame)
+    /// with a level per frame, colour keyframes at listed times (decoded on demand rather than all at once), a sphere
+    /// dissolve, and how the stage follows its subject when it drives or flies away.</para>
+    /// <para>Version 4 adds the hologram look (<c>look: "hologram"</c>): no colour probes; every object is drawn as light
+    /// computed per pixel from its hue, gains, contour spacing and height span (<see cref="IsHologram"/>), with a glow
+    /// (the highlight bytes) and how far it has materialised (the per-object level bytes) per frame, and a global fade
+    /// (per-frame float 7). Its triangles come as one mesh.</para>
     /// </summary>
     public sealed class Mesh4DContainer
     {
@@ -50,6 +57,21 @@ namespace ImmersiveX.Media
             public Vector2 DoorHeights;
             public Vector2 DoorAngles;
             public bool HasDoor;
+
+            /// <summary>Its own cutaway (version 3, flag 64): 1 a plane (discard where dot(p, <see cref="CutA"/>) is beyond a
+            /// distance that sweeps from <see cref="CutP0"/> to <see cref="CutP1"/>), 2 a wedge about axis <see cref="CutA"/>
+            /// centred on <see cref="CutRef"/> opening to <see cref="CutP1"/> radians; 0 none.</summary>
+            public int CutType;
+            public Vector3 CutA, CutRef;
+            public float CutP0, CutP1, CutGlowWidth = 0.02f;
+
+            /// <summary>The hologram look (version 4): its hue (display colour), gains (body, scan band), contour spacing and
+            /// height span in its own frame, and its range in the mesh (first vertex, vertex count, first index, index count).</summary>
+            public Color Hue = Color.white;
+            public Vector2 Gain = Vector2.one;
+            public float LineSpacing = 0.03f;
+            public Vector2 Span = new Vector2(0f, 1f);
+            public int[] MeshRange;
         }
 
         public sealed class Family
@@ -98,6 +120,16 @@ namespace ImmersiveX.Media
 
         public int Version;
         public string Title;
+
+        /// <summary>Version 4's hologram look: every object drawn as light computed per pixel (see <see cref="Holo"/>).</summary>
+        public bool IsHologram;
+
+        /// <summary>The hologram look's constants: base, rim, rim power, line; line width, sweep, sweep width, sweep speed;
+        /// sweep start, sweep span, scanlines, flicker; glow, front, front width, front noise.</summary>
+        /// <summary>The hologram's brightness in the room (light added over a lit room, not a dark void; 1 when not given).</summary>
+        public float HoloGain = 1f;
+
+        public Vector4[] Holo = { new Vector4(0.075f, 1.15f, 2.5f, 0.5f), new Vector4(0.0032f, 0.7f, 0.075f, 0.62f), new Vector4(-0.6f, 6.4f, 0.14f, 0.06f), new Vector4(0.85f, 1.7f, 0.05f, 0.16f) };
         public double Duration;
         public float Fps;
         public int Frames;
@@ -122,6 +154,30 @@ namespace ImmersiveX.Media
         public float StageHeight;
         public Vector3 Front = new Vector3(0f, 0f, 1f);
 
+        /// <summary>How tall the stage should stand in the room by default (metres; 0 when the content doesn't say), chosen by
+        /// the content so the whole piece fits a table. Add Media sets the media's Height from it.</summary>
+        public float RoomHeight;
+
+        /// <summary>The widest the scene gets around its centre over the whole piece (x, z, content units; 0 when not given).</summary>
+        public Vector2 Footprint;
+
+        /// <summary>Version 3: the time of each colour keyframe (null: one every 1 / <see cref="ColorRate"/> seconds).</summary>
+        public float[] ColorKeyTimes;
+
+        /// <summary>Version 3: each object's own cutaway level per frame (F × O, 0–255).</summary>
+        public byte[] CutLevels;
+
+        /// <summary>The set dissolves inside a sphere (version 3) instead of a cylinder, with the scene's own noise.</summary>
+        public bool DissolveSphere;
+        public float DissolveCentreY, DissolveNoiseScale = 0.55f, DissolveNoiseAmplitude = 2.2f, DissolveGlowWidth = 0.45f;
+
+        /// <summary>
+        /// How the stage follows its subject (the per-frame subject floats) once it leaves (content units; 0: not given).
+        /// The subject is held within <see cref="FollowDeadZone"/> of where it started, and the set dissolves beyond
+        /// <see cref="FollowRadius"/> of it.
+        /// </summary>
+        public float FollowRadius, FollowDeadZone;
+
         /// <summary>A soundtrack next to the container, named in its header (or null).</summary>
         public string AudioFile;
 
@@ -136,6 +192,12 @@ namespace ImmersiveX.Media
         public ushort[] AtlasObjects;
         public uint[] AtlasIndices;
         public uint[] TexelFront, TexelBack;
+
+        /// <summary>Version 4: the hologram's triangles, object by object (positions, normals as signed 16-bit, object index).</summary>
+        public float[] MeshPositions;
+        public short[] MeshNormals;
+        public ushort[] MeshObjects;
+        public uint[] MeshIndices;
 
         /// <summary>F × O × 12: columns 0–2 then the translation, per object per frame.</summary>
         public float[] Matrices;
@@ -160,11 +222,43 @@ namespace ImmersiveX.Media
                 throw new FormatException("The file is empty.");
             if (bytes[0] == 0x1f && bytes[1] == 0x8b)
                 bytes = Gunzip(bytes);
+            return Parse(bytes);
+        }
+
+        /// <summary>
+        /// Read a container file from disk, unpacking a gzipped one straight into a buffer of its final size (the size its
+        /// gzip trailer gives), so a large container needs about its own size in memory while loading, not several copies.
+        /// </summary>
+        public static Mesh4DContainer ReadFile(string path)
+        {
+            using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20))
+            {
+                if (file.Length < 12)
+                    throw new FormatException("The file is empty.");
+                var probe = new byte[2];
+                file.Read(probe, 0, 2);
+                if (probe[0] != 0x1f || probe[1] != 0x8b)
+                {
+                    file.Position = 0;
+                    return Parse(ReadAll(file, (int)file.Length));
+                }
+
+                var size = GzipSize(file);
+                file.Position = 0;
+                using (var gzip = new GZipStream(file, CompressionMode.Decompress))
+                    return Parse(ReadAll(gzip, size));
+            }
+        }
+
+        static Mesh4DContainer Parse(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length < 12)
+                throw new FormatException("The file is empty.");
             if (bytes[0] != (byte)'S' || bytes[1] != (byte)'P' || bytes[2] != (byte)'4' || bytes[3] != (byte)'M')
                 throw new FormatException("It isn't a 4D mesh container (no 'SP4M' at the start).");
             var container = new Mesh4DContainer { Version = BitConverter.ToInt32(bytes, 4) };
-            if (container.Version != 2)
-                throw new FormatException($"4D mesh container version {container.Version} isn't supported (version 2 is).");
+            if (container.Version < 2 || container.Version > 4)
+                throw new FormatException($"4D mesh container version {container.Version} isn't supported (versions 2 to 4 are).");
             var headerLength = BitConverter.ToInt32(bytes, 8);
             var header = Json.Parse(Encoding.UTF8.GetString(bytes, 12, headerLength)) as Dictionary<string, object>;
             if (header == null)
@@ -174,6 +268,51 @@ namespace ImmersiveX.Media
             container.ReadHeader(header);
             container.ReadSections(bytes, sectionsBase, (Dictionary<string, object>)header["sections"]);
             return container;
+        }
+
+        /// <summary>The room height a container file suggests (its <c>stage.roomHeight</c>), reading only its header; 0 when it
+        /// doesn't say or can't be read.</summary>
+        public static float SuggestedRoomHeight(string path)
+        {
+            try
+            {
+                using (var file = File.OpenRead(path))
+                {
+                    var probe = new byte[2];
+                    var gz = file.Read(probe, 0, 2) == 2 && probe[0] == 0x1f && probe[1] == 0x8b;
+                    file.Position = 0;
+                    using (var stream = gz ? (Stream)new GZipStream(file, CompressionMode.Decompress) : file)
+                    {
+                        var start = ReadExactly(stream, 12);
+                        if (start == null || start[0] != (byte)'S' || start[1] != (byte)'P' || start[2] != (byte)'4' || start[3] != (byte)'M')
+                            return 0f;
+                        var json = ReadExactly(stream, BitConverter.ToInt32(start, 8));
+                        if (!(Json.Parse(Encoding.UTF8.GetString(json)) is Dictionary<string, object> header))
+                            return 0f;
+                        return (float)Num(Obj(header, "stage"), "roomHeight");
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                return 0f;
+            }
+        }
+
+        static byte[] ReadExactly(Stream stream, int count)
+        {
+            if (count <= 0 || count > 64 << 20)
+                return null;
+            var buffer = new byte[count];
+            for (var read = 0; read < count;)
+            {
+                var n = stream.Read(buffer, read, count - read);
+                if (n <= 0)
+                    return null;
+                read += n;
+            }
+
+            return buffer;
         }
 
         /// <summary>True for the file names a 4D mesh container uses.</summary>
@@ -186,12 +325,42 @@ namespace ImmersiveX.Media
         static byte[] Gunzip(byte[] bytes)
         {
             using (var input = new MemoryStream(bytes))
-            using (var gzip = new GZipStream(input, CompressionMode.Decompress))
-            using (var output = new MemoryStream(bytes.Length * 2))
             {
-                gzip.CopyTo(output, 1 << 20);
-                return output.ToArray();
+                var size = GzipSize(input);
+                input.Position = 0;
+                using (var gzip = new GZipStream(input, CompressionMode.Decompress))
+                    return ReadAll(gzip, size);
             }
+        }
+
+        /// <summary>The unpacked size a gzip stream's trailer gives (its last four bytes; containers stay under 2 GB).</summary>
+        static int GzipSize(Stream stream)
+        {
+            var trailer = new byte[4];
+            stream.Position = stream.Length - 4;
+            if (stream.Read(trailer, 0, 4) != 4)
+                throw new FormatException("The gzip stream is cut short.");
+            var size = BitConverter.ToUInt32(trailer, 0);
+            if (size < 12 || size > int.MaxValue)
+                throw new FormatException("The gzip stream's size is out of range (containers must be under 2 GB unpacked).");
+            return (int)size;
+        }
+
+        /// <summary>Exactly <paramref name="size"/> bytes from <paramref name="stream"/>, which must hold no more.</summary>
+        static byte[] ReadAll(Stream stream, int size)
+        {
+            var buffer = new byte[size];
+            for (var read = 0; read < size;)
+            {
+                var n = stream.Read(buffer, read, Math.Min(1 << 20, size - read));
+                if (n <= 0)
+                    throw new FormatException("The file is shorter than its gzip trailer says.");
+                read += n;
+            }
+
+            if (stream.ReadByte() >= 0)
+                throw new FormatException("The file is longer than its gzip trailer says.");
+            return buffer;
         }
 
         // ---------------------------------------------------------------- header
@@ -218,11 +387,16 @@ namespace ImmersiveX.Media
             Probes = (int)Num(h, "probes");
             Triangles = (int)Num(h, "triangles");
             AudioFile = Str(h, "audio");
+            IsHologram = Version >= 4 && Str(h, "look") == "hologram";
             var atlas = Obj(h, "atlas");
             AtlasWidth = (int)Num(atlas, "width");
             AtlasHeight = (int)Num(atlas, "height");
-            if (Frames <= 0 || ColorKeys <= 0 || Probes <= 0 || AtlasWidth <= 0 || AtlasHeight <= 0)
+            if (IsHologram)
+                ReadHolo(Obj(h, "holo"));
+            else if (Frames <= 0 || ColorKeys <= 0 || Probes <= 0 || AtlasWidth <= 0 || AtlasHeight <= 0)
                 throw new FormatException("The container's header is missing its frames, colours or atlas.");
+            if (Frames <= 0)
+                throw new FormatException("The container's header has no frames.");
 
             var objects = List(h, "objects") ?? throw new FormatException("The container has no objects.");
             Objects = new ObjectInfo[objects.Count];
@@ -253,6 +427,34 @@ namespace ImmersiveX.Media
                     info.HasDoor = true;
                     info.DoorHeights = new Vector2(At(y, 0), At(y, 1));
                     info.DoorAngles = new Vector2(At(a, 0), At(a, 1));
+                }
+
+                var hue = List(o, "hue");
+                if (hue != null)
+                    info.Hue = new Color(At(hue, 0), At(hue, 1), At(hue, 2));
+                var gain = List(o, "gain");
+                if (gain != null)
+                    info.Gain = new Vector2(At(gain, 0, 1f), At(gain, 1, 1f));
+                info.LineSpacing = (float)Num(o, "lines", info.LineSpacing);
+                var span = List(o, "span");
+                if (span != null)
+                    info.Span = new Vector2(At(span, 0), At(span, 1, 1f));
+                var meshRange = List(o, "mesh");
+                if (meshRange != null && meshRange.Count == 4)
+                    info.MeshRange = new[] { (int)At(meshRange, 0), (int)At(meshRange, 1), (int)At(meshRange, 2), (int)At(meshRange, 3) };
+
+                var cut = Obj(o, "cut");
+                if (cut != null)
+                {
+                    var plane = Str(cut, "type") == "plane";
+                    var axis = List(cut, plane ? "n" : "axis");
+                    var reference = List(cut, "ref");
+                    info.CutType = plane ? 1 : 2;
+                    info.CutA = new Vector3(At(axis, 0), At(axis, 1), At(axis, 2));
+                    info.CutRef = new Vector3(At(reference, 0), At(reference, 1), At(reference, 2));
+                    info.CutP0 = (float)Num(cut, "dOut");
+                    info.CutP1 = (float)Num(cut, plane ? "dIn" : "aMax");
+                    info.CutGlowWidth = (float)Num(cut, "glow", 0.02);
                 }
 
                 Objects[i] = info;
@@ -295,6 +497,10 @@ namespace ImmersiveX.Media
             var centre = List(stage, "centre");
             Centre = new Vector2(At(centre, 0), At(centre, 1));
             StageHeight = (float)Num(stage, "height", 1d);
+            RoomHeight = (float)Num(stage, "roomHeight");
+            var footprint = List(stage, "footprint");
+            if (footprint != null)
+                Footprint = new Vector2(At(footprint, 0), At(footprint, 1));
             var front = List(stage, "front");
             if (front != null)
                 Front = new Vector3(At(front, 0), At(front, 1), At(front, 2, 1f));
@@ -341,6 +547,40 @@ namespace ImmersiveX.Media
             var dissolve = List(rules, "dissolveGlow");
             if (dissolve != null)
                 DissolveGlow = Color.Lerp(new Color(At(dissolve, 0), At(dissolve, 1), At(dissolve, 2)), Color.white, 0.3f);
+            if (Version < 3)
+                return;
+
+            var cutGlow = List(rules, "cutGlow");
+            if (cutGlow != null)
+                CutGlow = new Color(At(cutGlow, 0), At(cutGlow, 1), At(cutGlow, 2));
+            var sphere = Obj(rules, "dissolve");
+            if (sphere != null && Str(sphere, "shape") == "sphere")
+            {
+                DissolveSphere = true;
+                DissolveCentreY = (float)Num(sphere, "centreY");
+                DissolveNoiseScale = (float)Num(sphere, "noiseScale", DissolveNoiseScale);
+                DissolveNoiseAmplitude = (float)Num(sphere, "noiseAmplitude", DissolveNoiseAmplitude);
+                DissolveGlowWidth = (float)Num(sphere, "glowWidth", DissolveGlowWidth);
+            }
+
+            var times = List(h, "colorKeyTimes");
+            if (times != null && times.Count == ColorKeys)
+                ColorKeyTimes = times.ConvertAll(x => (float)(double)x).ToArray();
+            var follow = Obj(h, "follow");
+            FollowRadius = (float)Num(follow, "radius");
+            FollowDeadZone = (float)Num(follow, "deadZone");
+        }
+
+        void ReadHolo(Dictionary<string, object> holo)
+        {
+            if (holo == null)
+                return;
+            float N(string key, float fallback) => (float)Num(holo, key, fallback);
+            Holo[0] = new Vector4(N("base", Holo[0].x), N("rim", Holo[0].y), N("rimPow", Holo[0].z), N("line", Holo[0].w));
+            Holo[1] = new Vector4(N("lineW", Holo[1].x), N("sweep", Holo[1].y), N("sweepW", Holo[1].z), N("sweepSpeed", Holo[1].w));
+            Holo[2] = new Vector4(N("sweepLo", Holo[2].x), N("sweepSpan", Holo[2].y), N("scan", Holo[2].z), N("flicker", Holo[2].w));
+            Holo[3] = new Vector4(N("hi", Holo[3].x), N("edge", Holo[3].y), N("edgeW", Holo[3].z), N("revealNoise", Holo[3].w));
+            HoloGain = N("roomGain", 1f);
         }
 
         // ---------------------------------------------------------------- sections
@@ -354,6 +594,25 @@ namespace ImmersiveX.Media
                 if (required)
                     throw new FormatException($"The container has no '{name}' section.");
                 return (-1, 0);
+            }
+
+            if (IsHologram)
+            {
+                var (mp, mpl) = Find("mesh.pos");
+                MeshPositions = Floats(bytes, mp, mpl / 4);
+                var (mn, mnl) = Find("mesh.nor");
+                MeshNormals = new short[mnl / 2];
+                Buffer.BlockCopy(bytes, mn, MeshNormals, 0, mnl);
+                var (mo, mol) = Find("mesh.obj");
+                MeshObjects = UShorts(bytes, mo, mol / 2);
+                var (mi, mil) = Find("mesh.idx");
+                MeshIndices = UInts(bytes, mi, mil / 4);
+                if (MeshNormals.Length != MeshPositions.Length || MeshObjects.Length * 3 != MeshPositions.Length)
+                    throw new FormatException("The hologram mesh's positions, normals and object indices don't match.");
+                var (hp, hpl) = Find("poses");
+                DecodePoses(bytes, hp, hpl);
+                ReadEffects(Find("fx", required: false));
+                return;
             }
 
             var (posAt, posLen) = Find("atlas.pos");
@@ -394,15 +653,21 @@ namespace ImmersiveX.Media
             }
 
             var (colAt, colLen) = Find("colors");
-            Colors = DecodeColors(bytes, colAt, colLen, Probes, ColorKeys);
+            if (Version >= 3)
+                IndexColors(bytes, colAt, colLen);
+            else
+                Colors = DecodeColors(bytes, colAt, colLen, Probes, ColorKeys);
             var (poseAt, poseLen) = Find("poses");
             DecodePoses(bytes, poseAt, poseLen);
-            var (fxAt, fxLen) = Find("fx", required: false);
-            if (fxAt >= 0 && fxLen > 0)
+            ReadEffects(Find("fx", required: false));
+
+            void ReadEffects((int offset, int length) fx)
             {
+                if (fx.offset < 0 || fx.length <= 0)
+                    return;
                 _fx = bytes;
-                _fxOffsets = UInts(bytes, fxAt, Frames + 1);
-                _fxBase = fxAt + (Frames + 1) * 4;
+                _fxOffsets = UInts(bytes, fx.offset, Frames + 1);
+                _fxBase = fx.offset + (Frames + 1) * 4;
             }
         }
 
@@ -468,12 +733,118 @@ namespace ImmersiveX.Media
             return colors;
         }
 
+        // ---------------------------------------------------------------- colour keyframes on demand (version 3)
+
+        const int SnapshotEvery = 64;
+        byte[] _colorBytes;
+        int[] _keyOffsets;
+        byte[][] _snapshots;
+        byte[] _cursor;
+        int _cursorKey = -1;
+
+        /// <summary>Version 3 keeps the colour stream as it is: one pass finds every keyframe's changes, and a full copy is
+        /// kept every 64 keyframes, so any keyframe is a copy plus at most 63 sets of changes.</summary>
+        void IndexColors(byte[] b, int offset, int length)
+        {
+            var stride = Probes * 3;
+            _colorBytes = b;
+            _keyOffsets = new int[ColorKeys];
+            _snapshots = new byte[(ColorKeys + SnapshotEvery - 1) / SnapshotEvery][];
+            var running = new byte[stride];
+            Buffer.BlockCopy(b, offset, running, 0, stride);
+            _snapshots[0] = (byte[])running.Clone();
+            var pos = offset + stride;
+            for (var k = 1; k < ColorKeys; k++)
+            {
+                _keyOffsets[k] = pos;
+                pos = ApplyChanges(b, pos, running);
+                if (k % SnapshotEvery == 0)
+                    _snapshots[k / SnapshotEvery] = (byte[])running.Clone();
+            }
+
+            if (pos > offset + length)
+                throw new FormatException("The colour section is shorter than its keyframes.");
+            _cursor = running;
+            _cursorKey = ColorKeys - 1;
+        }
+
+        static int ApplyChanges(byte[] b, int pos, byte[] rgb)
+        {
+            var n = Varint(b, ref pos);
+            var index = -1;
+            for (var j = 0; j < n; j++)
+            {
+                index += Varint(b, ref pos) + 1;
+                var o = index * 3;
+                rgb[o] = b[pos];
+                rgb[o + 1] = b[pos + 1];
+                rgb[o + 2] = b[pos + 2];
+                pos += 3;
+            }
+
+            return pos;
+        }
+
+        /// <summary>Colour keyframe <paramref name="key"/> as RGB bytes, 3 per probe (valid until the next call).</summary>
+        public byte[] ColorKey(int key)
+        {
+            if (Colors != null)
+            {
+                var copy = _cursor ?? (_cursor = new byte[Probes * 3]);
+                Buffer.BlockCopy(Colors, key * Probes * 3, copy, 0, Probes * 3);
+                return copy;
+            }
+
+            if (key == _cursorKey)
+                return _cursor;
+            if (key < _cursorKey || key - _cursorKey >= SnapshotEvery)
+            {
+                var s = key / SnapshotEvery;
+                Buffer.BlockCopy(_snapshots[s], 0, _cursor, 0, _cursor.Length);
+                _cursorKey = s * SnapshotEvery;
+            }
+
+            for (var k = _cursorKey + 1; k <= key; k++)
+                ApplyChanges(_colorBytes, _keyOffsets[k], _cursor);
+            _cursorKey = key;
+            return _cursor;
+        }
+
+        /// <summary>The colour keyframes around scene time <paramref name="t"/> and how far between them it is.</summary>
+        public void KeyAt(double t, out int k0, out int k1, out float mix)
+        {
+            if (ColorKeyTimes == null)
+            {
+                var kx = Mathf.Clamp((float)(t * ColorRate), 0f, ColorKeys - 1);
+                k0 = (int)kx;
+                k1 = Mathf.Min(ColorKeys - 1, k0 + 1);
+                mix = kx - k0;
+                return;
+            }
+
+            var times = ColorKeyTimes;
+            if (t <= times[0]) { k0 = k1 = 0; mix = 0f; return; }
+            if (t >= times[times.Length - 1]) { k0 = k1 = times.Length - 1; mix = 0f; return; }
+            int lo = 0, hi = times.Length - 1;
+            while (hi - lo > 1)
+            {
+                var m = (lo + hi) >> 1;
+                if (times[m] <= t) lo = m; else hi = m;
+            }
+
+            k0 = lo;
+            k1 = hi;
+            mix = (float)((t - times[lo]) / Math.Max(1e-6, times[hi] - times[lo]));
+        }
+
         void DecodePoses(byte[] b, int offset, int length)
         {
             var objects = Objects.Length;
             Matrices = new float[(long)Frames * objects * 12];
             Visible = new byte[Frames * objects];
             Highlights = new byte[Frames * objects];
+            if (Version >= 3)
+                CutLevels = new byte[Frames * objects];
             FrameFloats = new float[Frames * FloatsPerFrame];
             var visBytes = (objects + 7) / 8;
             var pos = offset;
@@ -507,6 +878,17 @@ namespace ImmersiveX.Media
 
                 Buffer.BlockCopy(b, pos, FrameFloats, f * FloatsPerFrame * 4, FloatsPerFrame * 4);
                 pos += FloatsPerFrame * 4;
+                if (CutLevels == null)
+                    continue;
+                if (f > 0)
+                    Buffer.BlockCopy(CutLevels, (f - 1) * objects, CutLevels, f * objects, objects);
+                var cuts = Varint(b, ref pos);
+                o = -1;
+                for (var j = 0; j < cuts; j++)
+                {
+                    o += Varint(b, ref pos) + 1;
+                    CutLevels[f * objects + o] = b[pos++];
+                }
             }
 
             if (pos > offset + length)

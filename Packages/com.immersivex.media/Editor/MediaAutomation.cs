@@ -255,7 +255,8 @@ namespace ImmersiveX.Media.Editor
             }
 
             var panel = controls != null
-                ? $" · controls at {controls.transform.position:F2} showing {(controls.ShowsPause ? "pause" : "play")} and {(controls.ShowsMuted ? "muted" : "speaker")}"
+                ? $" · controls at {controls.Panel.position:F2} ('{controls.Title}') showing {(controls.ShowsPause ? "pause" : "play")} and {(controls.ShowsMuted ? "muted" : "speaker")}" +
+                  (controls.Caption != null ? $" · caption at {controls.CaptionPosition:F2}" : string.Empty)
                 : string.Empty;
             EditorAutomation.Report(command, "ok", media.DescribeStatus() + panel);
         }

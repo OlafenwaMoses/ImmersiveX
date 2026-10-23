@@ -119,6 +119,11 @@ namespace ImmersiveX.Media.Editor
                     {
                         mediaSource = Relative(InStreamingAssets(path) ? path : CopyFolder(path, SafeName(title)));
                         frameRate = options.FrameRate;
+                        // a 4D mesh can say how tall it should stand so the whole piece fits a table
+                        var container = Directory.GetFiles(path).FirstOrDefault(f => Mesh4DContainer.IsContainerName(f));
+                        var roomHeight = container != null ? Mesh4DContainer.SuggestedRoomHeight(container) : 0f;
+                        if (roomHeight >= 0.3f && roomHeight <= 4f)
+                            height = roomHeight;
                     }
                 }
                 else if (File.Exists(path))

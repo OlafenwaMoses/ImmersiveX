@@ -5,7 +5,7 @@
 2. attaches the right player;
 3. shows the same acrylic media controls and side handles whatever the format.
 
-A scene can hold as many as you like. Each has its own controls, and each stays where the user put it, held there by a spatial anchor.
+A scene can hold as many as you like. Each has its own controls; each starts in front of the user and then stays where the user puts it, held there by a spatial anchor.
 
 ## Adding content (no code)
 **ImmersiveX ▸ Media ▸ Add Media…** takes a file, a folder of frames or a URL, and adds it to the open scene as Immersive Media:
@@ -67,10 +67,9 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
 - **Proprietary volumetric formats:** see [Vendor formats](#vendor-formats).
 
 ## Where it stands
-- **The first media in the scene hierarchy** stands at the **centre of the mapped room**; the others stand around it. With no mapped room, as in the editor simulators, the group centres 2 m in front of the user.
-  - **Placement:** *Room Centre* (default) or *In Front Of User*, at **Distance From User** (2 m).
-  - Set **Spot** to choose: 0 is the centre and 1 and up stand around it.
-  - **With the content menu on** (the default), one piece shows at a time, and the menu lists them in hierarchy order. See [CONTENT_GUIDE.md](../CONTENT_GUIDE.md#placing-content-in-the-app) for placing each kind of content.
+- **In front of the user, on the floor under them, facing them:** when the app starts and whenever it's picked in the content menu, at **Distance From User** (2 m). The floor is the one the user is standing on: a mapped room counts only when its floor is under them (0.4 to 2.3 m below their eyes), so a room mapped on another storey is ignored, and so is its outline when keeping content inside the room.
+  - **With the content menu on** (the default), one piece shows at a time and takes that spot, and the menu lists them in hierarchy order.
+  - With the menu off and several pieces showing, the first stands in front and the others around it; set **Spot** to choose (0 is in front, 1 and up stand around it). See [CONTENT_GUIDE.md](../CONTENT_GUIDE.md#placing-content-in-the-app) for placing each kind of content.
 - **Standing media** is fitted to **Height** (1.60 m by default) with its feet on the floor, facing the user. Add Media sets Height to a packed capture's real size.
 - **Hologram streams** are fitted frame by frame and jump at camera cuts. A stream with a `fit` in its `stream.json` keeps that one fit for the whole clip, so a character keeps its size when it raises an arm.
 - **Sequences** keep the first frame's scale, so a performer can move.
@@ -80,27 +79,30 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
 - **Far background:** a splat scan's distant background (a sky shell far outside the scene) is left out, so the capture stands in the room. It keeps everything within three times the distance of its nearest 90 % of splats.
 - **Scene-scale captures** (a room, a plaza) are fitted to Height like any other standing media, so they show as a diorama. Resize them with the corner handle.
 - **It moves only when the user moves it, and it stays where it's put:**
-  - The first time, it's anchored where it's placed.
-  - When the user lets go after moving, turning or resizing it, it's anchored again half a second later. The anchor is saved on the device, and the old one is erased.
-  - Next launch, it comes back at its **spatial anchor**: the same real-world spot, even if the headset re-centred.
+  - It's anchored where it's placed (in front of the user at start and on each pick).
+  - When the user lets go after moving, turning or resizing it, it's anchored again half a second later, and the old anchor is erased.
+  - The next launch, or picking it again in the menu, puts it in front of the user again: earlier anchors aren't restored, since the user may be in another room.
   - While the app runs, it **follows its anchor**. When the headset is taken off and put back on, or tracking is corrected, it stays in the same real spot. Until the device finds the anchor again, it's hidden rather than shown in the wrong place.
   - **Fallback:** its place is also saved relative to the recognised room, or to the tracking space when no room is mapped. That's used when the anchor can't be loaded, and on platforms that can't save anchors (XR Simulation).
   - "Forget room" forgets those places and erases their anchors.
 
 ## What the user can do
-- **Controls** (an acrylic-glass panel in front of each piece of media):
-  - Play/Pause (the icon shows what it will do), seek bar (seeks on release), time, speaker (mute) and volume.
+- **Controls** (an acrylic-glass panel, 36 cm wide, that stays with the user, `WithinReach`):
+  - Play/Pause (the icon shows what it will do), seek bar (seeks on release), time, speaker (mute) and volume, with the media's name on a tab above.
   - For stills (splats, meshes, photos, unanimated models), Play and the seek bar are greyed out and the panel shows what the file is.
-  - The panel follows the media when it moves but not when it turns.
-  - 360° and 180° media put the panel in front of the user.
+  - Whatever the media (standing, a screen, 360°/180°), the panel sits **low on the user's right at elbow level**: 0.55 m below the eyes (about 1 m above the floor standing, lower sitting), 0.24 m to the right and 0.38 m in front, tilted to face the eyes.
+  - It keeps still while the user looks around, looks down at it or leans in to press it, and while its sliders or the move bar are dragged. When they walk more than 0.35 m, sit down or stand up, or turn more than 40° while not looking at it, it glides after them (about 0.3 s) and settles at their side again.
+  - When the content menu switches pieces, the new piece's panel appears straight at the user's side. Several pieces shown at once stack their panels upwards.
+  - **Captions** (narrated media) stay with the media, where the user watches: in front of standing media on the user's side (coming round as they walk around it), under a screen, or in front of the user for 360°/180° media.
 - **Handles** (a controller's ray, or a hand at them):
-  - **Move bar**, under the controls: drag to slide the media across the floor. It stays inside the room.
+  - **Move bar**, under the controls (so it's within reach too): drag to slide the media across the floor, by the same amount the hand moves. A hand on it carries it along. The media stays inside the room.
   - **Turn bars**, at its left and right, and a **turn ring** around its base: drag around it like a turntable. It only turns about the up axis.
   - **Resize corner**, top right: drag up to make it bigger, down to make it smaller.
 - **Grab the media itself** with a hand or controller at it: one hand slides it and a wrist twist turns it; two hands turn it like a wheel. A controller's ray only clicks and drags handles; it never picks content up.
 - **Hands have no pointer:** tracked hands press buttons with a finger and pinch or grab what's within reach. Controllers in hand keep their rays (Settings ▸ Hand Pointers gives hands rays too).
 - **Parts:** models with two or more meshes, web scenes and 4D meshes have selectable parts. A ray click selects a part (click again for the whole), a hand picks it up, and its label's **Put back** returns it. Parts move only while the media is paused. Turn it off with **Selectable Parts**.
-- **Content menu:** lists every piece of content in the scene and shows one at a time (the choice is remembered), with **Quest menu** and **Close app**. A quick sideways swipe of either hand opens it: towards the middle of the body (right hand right to left, left hand left to right); the reverse closes it. See the [README](../README.md#in-the-headset) for the picture. Turn it off in Settings ▸ Content Menu.
+- **Content menu:** lists every piece of content in the scene and shows one at a time (the choice is remembered), with **Quest menu** and **Close app**. It opens in front of the user when the app starts; after that a quick sideways swipe of either hand opens it: towards the middle of the body (right hand right to left, left hand left to right); the reverse closes it. With more than six pieces, up and down buttons on the right of the list scroll it a row a click. **Space** (in its footer, a green dot when the room is saved) shows what's saved about the room, with **Re-create space** to map it again (Space Setup on Quest) or **Back** to the menu. See the [README](../README.md#in-the-headset) for the picture. Turn it off in Settings ▸ Content Menu.
+- **MR and VR** (the content menu's header, MR at every start): **MR** shows the real room with content standing in it. **VR** hides the real room and puts the user in a quiet, low-lit virtual world (a night sky with faint stars over a dark floor at the real floor's height) where any content stands out. Content keeps its place in the real room either way, the Quest's boundary comes back in VR, and the real walls and furniture show as a soft grid when the user comes within about a metre of them.
 
 It waits, paused, for Play unless **Play On Start** is set. With **Loop** off, it stops at the end and Play starts it again.
 
@@ -177,8 +179,10 @@ A three.js page (WebGLRenderer, r170 or later) as one self-contained `.html`, a 
 ## 4D meshes
 A `.sp4m` container is a scene baked over time: its triangles part by part, every part's pose 30 times a second, its colours twice a second, the rules it applies per pixel (a cutaway, a door, a dissolving set, highlights) and its soft effects as Gaussians.
 - **Bring a folder** with the container and its soundtrack. The container is gzipped inside but never named `.gz`: Android's APK packer unzips `.gz` files and drops the extension. Add Media renames `name.sp4m.gz` to `name.sp4m`, and the build check refuses a `.gz` name.
-- **How it plays:** standing on the floor, as tall as **Height**, on its soundtrack's clock with the standard controls. Its colours are baked, so nothing is relit. Captions show above the controls, and cards point at the parts the content names. Its parts are selectable.
-- **Budget:** a two-minute scene of about 160 objects and 400,000 triangles is a container of about 50 MB that loads in under a second on a Quest 3.
+- **How it plays:** standing on the floor, as tall as **Height**, on its soundtrack's clock with the standard controls. Its colours are baked, so nothing is relit. Captions show in front of it on the user's side, and cards point at the parts the content names. Its parts are selectable.
+- **When its subject drives or flies away** (a rocket climbing, cars driving off), the stage follows it: the subject stays at the media's place at the same size, and what it leaves behind slides away and dissolves at the edge of the room or sinks below the floor. The content can set how (`follow`: a radius and a dead zone); otherwise a subject that ends up more than one and a half stage heights from its start is held within a quarter of a stage height of it, and the set dissolves two stage heights from it.
+- **Versions:** version 2 colours through a texture atlas with one cutaway wedge, a door and a set dissolving outward. Version 3 adds scenes coloured per vertex (every object a one-member family), each object's own cutaway (a plane or a wedge in its frame, with a level per frame), colour keyframes at listed times decoded on demand, a sphere dissolve with the scene's own noise, `follow`, and `stage.footprint` / `stage.roomHeight`: how wide the piece gets over its whole run, and how tall it should stand so it fits (Add Media sets **Height** from it). Its captions stand clear of the footprint's front edge. Version 4 is the **hologram look** (`look: "hologram"`): no colour probes; every object is light worked out per pixel (`Mesh4DHologram.shader`) from its hue, gains (body, scan band), contour spacing and height span: a rim glow, contour lines fixed to its body, a scan band climbing it, screen scanlines, a flicker, and a front where it materialises, all added over the room. Per frame the highlight bytes are its glow, the per-object level bytes how far it has materialised, and float 7 a global fade; `holo` carries the look's constants (the web player's maths) and `roomGain` its brightness in the room.
+- **Budget:** a two-minute scene of about 160 objects and 400,000 triangles is a container of about 50 MB that loads in under a second on a Quest 3. A five-minute version 3 scene (162 objects, 482,000 triangles, 396,000 per-vertex probes, 1,846 colour keys) is 45 MB and loads in about a second in the editor. A 33-second version 4 hologram (224 objects, 413,000 triangles, up to 19,400 effect Gaussians a frame) is 62 MB and loads in under a second; a four-minute one (254 objects, 614,000 triangles, 303 MB) loads in about 4 s on a Quest 3 and plays at 72 fps. Large containers are copied out of the APK once per build and unpacked in one pass, so loading needs about the container's own size in memory.
 
 ## Automation
 With the editor open (see [CONTRIBUTING](../CONTRIBUTING.md#driving-the-open-editor-automation)):

@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
@@ -9,7 +8,7 @@ namespace ImmersiveX
 {
     public enum PlacementRule
     {
-        /// <summary>Appear in front of the user the first time the app starts (default).</summary>
+        /// <summary>Appear in front of the user when the app starts and whenever it's picked in the content menu (default).</summary>
         InFrontOfUser,
         /// <summary>Start exactly where the object is in the scene.</summary>
         KeepScenePosition,
@@ -17,9 +16,10 @@ namespace ImmersiveX
 
     /// <summary>
     /// Makes an object part of the immersive experience: it can be grabbed with a hand or controller at it (the ray only
-    /// clicks) and floats where it's released. It moves only when the user moves it: where it's left is kept with a spatial anchor (see
-    /// <see cref="ContentAnchor"/>), so it's in the same real spot after the headset comes off or the app restarts. The
-    /// first time, it's placed by its <see cref="PlacementRule"/>.
+    /// clicks) and floats where it's released. It's placed by its <see cref="PlacementRule"/> when the app starts (in front of
+    /// the user by default, and again whenever it's picked in the content menu); then it moves only when the user moves it,
+    /// held in place with a spatial anchor (see <see cref="ContentAnchor"/>) through tracking corrections and the headset
+    /// coming off.
     /// This is the one component you need. Add it with right-click ▸ ImmersiveX ▸ Make Immersive.
     /// </summary>
     [DisallowMultipleComponent]
@@ -53,6 +53,7 @@ namespace ImmersiveX
         readonly List<Renderer> _measured = new List<Renderer>();
         bool _isHidden;
         bool _hiddenByMenu;
+        bool _placed;
 
         public string ContentId => _contentId;
         public PlacementRule Placement => _placement;
@@ -62,43 +63,19 @@ namespace ImmersiveX
         public ContentParts Parts => _parts;
 
         /// <summary>
-        /// Put the object back where the user left it (its spatial anchor, else where it was saved in the room). The first
-        /// time, place it by its rule for a user standing at <paramref name="userPose"/> and anchor it there.
+        /// Place the object by its rule for a user standing at <paramref name="userPose"/> (when the app starts) and anchor it
+        /// there. Saved anchors from earlier visits aren't used: the room may be another one.
         /// </summary>
         public void PlaceForUser(Pose userPose)
         {
-            if (isActiveAndEnabled)
-                StartCoroutine(Place(userPose));
-        }
-
-        IEnumerator Place(Pose userPose)
-        {
-            RestoredPlacement restored = null;
-            var restoring = true;
-            _anchoring.Restore(result =>
-            {
-                restored = result;
-                restoring = false;
-            });
-            while (restoring)
-                yield return null;
-
-            if (restored != null)
-            {
-                transform.SetPositionAndRotation(restored.Pose.position, restored.Pose.rotation);
-                if (restored.Size > 0f)
-                    transform.localScale = _originalScale * restored.Size; // resized with its handle
-                ImmersiveXLog.Info($"'{name}' is back {(restored.FromAnchor ? "at its spatial anchor" : "where it was left in the room")}.");
-                if (restored.FromAnchor)
-                    yield break;
-            }
-            else if (_placement == PlacementRule.InFrontOfUser)
+            if (_placement == PlacementRule.InFrontOfUser)
             {
                 var pose = UserRelativePlacement.Apply(userPose, _offsetFromUser);
                 transform.SetPositionAndRotation(pose.position, pose.rotation);
             }
 
-            SavePlacement(); // anchor it here, so it's in this spot next time too
+            _placed = true;
+            SavePlacement(); // anchored here for this visit
         }
 
         /// <summary>Remember where the object is now, and its size (anchored and saved). Called when the user lets go of it.</summary>
@@ -241,8 +218,18 @@ namespace ImmersiveX
         /// <summary>False while the content menu shows something else.</summary>
         public bool IsShown => !_hiddenByMenu;
 
-        /// <summary>Show or hide it (the content menu).</summary>
-        public void SetShown(bool shown) => _hiddenByMenu = !shown;
+        /// <summary>Show or hide it (the content menu). Picked again, it comes back in front of the user (its rule allowing).</summary>
+        public void SetShown(bool shown)
+        {
+            var picked = shown && _hiddenByMenu;
+            _hiddenByMenu = !shown;
+            var head = Camera.main != null ? Camera.main.transform : null;
+            var session = ImmersiveXSession.Instance;
+            if (session != null && session.Origin != null && session.Origin.Camera != null)
+                head = session.Origin.Camera.transform;
+            if (picked && _placed && head != null && _placement == PlacementRule.InFrontOfUser)
+                PlaceForUser(UserRelativePlacement.UserPose(head));
+        }
 
         void EnsureContentId()
         {

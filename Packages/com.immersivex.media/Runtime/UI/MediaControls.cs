@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -8,9 +9,10 @@ namespace ImmersiveX.Media
     /// <summary>
     /// Media controls on an acrylic-glass panel: play/pause (one button whose icon shows what it will do), a seek bar
     /// you can drag to any point, the time, a speaker button that mutes, and a volume slider. The panel is mostly
-    /// transparent; only the controls are solid.
-    /// <para>It follows an anchor (the media it controls) by position only, so moving the media moves the panel with
-    /// it, while turning the media leaves the panel where it is.</para>
+    /// transparent; only the controls are solid. A tab above it names the media.
+    /// <para>The panel stays within reach of the user, low on their right at elbow level, and glides after them when they
+    /// walk or turn (see <see cref="WithinReach"/>). Narrated media's caption stays with the media instead, where the user
+    /// is looking (<see cref="PlaceCaption"/>).</para>
     /// </summary>
     [AddComponentMenu("ImmersiveX/Media/Media Controls")]
     public sealed class MediaControls : MonoBehaviour
@@ -19,6 +21,9 @@ namespace ImmersiveX.Media
         const float Height = 150f;
         const float RefreshSeconds = 0.05f;
 
+        /// <summary>The panel's size beside the user, against its 600 × 150 mm layout: 36 cm wide.</summary>
+        public const float PanelScale = 0.6f;
+
         static readonly Color Glass = new Color(0.07f, 0.09f, 0.13f, 0.32f);
         static readonly Color Rim = new Color(1f, 1f, 1f, 0.38f);
         static readonly Color Solid = Color.white;
@@ -26,8 +31,13 @@ namespace ImmersiveX.Media
         static readonly Color Track = new Color(1f, 1f, 1f, 0.28f);
 
         IMediaTransport _media;
-        Transform _anchor;
-        Vector3 _offset;
+        WithinReach _panel;
+        Transform _captionRoot;
+        Transform _captionAnchor;
+        Vector3 _captionOffset;
+        bool _captionTowardViewer;
+        Vector3 _captionDirection;
+        Text _title;
         Image _playIcon;
         Image _speakerIcon;
         Button _playButton;
@@ -38,37 +48,64 @@ namespace ImmersiveX.Media
         Text _caption;
         Image _captionGlass;
         bool _seeking;
+        bool _adjusting;
         float _nextRefresh;
 
-        /// <summary>Create controls for <paramref name="media"/> that follow <paramref name="anchor"/>.</summary>
-        public static MediaControls Create(IMediaTransport media, Transform anchor)
+        /// <summary>Create controls for <paramref name="media"/>, titled <paramref name="title"/>.</summary>
+        public static MediaControls Create(IMediaTransport media, string title, Func<Transform> viewer)
         {
             var controls = new GameObject("Media Controls").AddComponent<MediaControls>();
             controls._media = media;
-            controls._anchor = anchor;
-            controls.Build();
+            controls.Viewer = viewer;
+            controls.Build(title);
             return controls;
         }
 
-        /// <summary>Follow <paramref name="anchor"/> by position (null: stay where placed).</summary>
-        public void Follow(Transform anchor) => _anchor = anchor;
+        /// <summary>The panel (it moves with the user); the move bar sits under it.</summary>
+        public Transform Panel => _panel.transform;
+
+        /// <summary>Who the panel stays with and the caption faces.</summary>
+        public Func<Transform> Viewer { get; private set; }
+
+        /// <summary>While this returns true the panel keeps still (as it does while its own sliders are dragged).</summary>
+        public Func<bool> Hold;
 
         /// <summary>
-        /// Put the panel at <paramref name="worldOffset"/> from the anchor (or at that world position with no anchor), facing
-        /// <paramref name="viewer"/>. The offset is kept in world space, so it doesn't turn when the anchor turns.
+        /// Put the caption at <paramref name="worldOffset"/> from <paramref name="anchor"/> (the media), or at that world
+        /// position with no anchor. The offset is kept in world space, so it doesn't turn when the media turns. With
+        /// <paramref name="towardViewer"/> it comes round to the user's side of the media as they walk around it (never
+        /// closer than 0.4 m short of them).
         /// </summary>
-        public void Place(Vector3 worldOffset, Vector3 viewer)
+        public void PlaceCaption(Transform anchor, Vector3 worldOffset, bool towardViewer = false)
         {
-            _offset = worldOffset;
-            var position = _anchor != null ? _anchor.position + worldOffset : worldOffset;
-            var facing = position - viewer;
-            transform.SetPositionAndRotation(position, facing.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(facing, Vector3.up) : transform.rotation);
+            _captionAnchor = anchor;
+            _captionOffset = worldOffset;
+            _captionTowardViewer = towardViewer;
+            _captionDirection = new Vector3(worldOffset.x, 0f, worldOffset.z).normalized;
+            LateUpdate();
+        }
+
+        Vector3 CaptionOffset(Transform viewer)
+        {
+            if (!_captionTowardViewer || _captionAnchor == null || viewer == null)
+                return _captionOffset;
+            var flat = Vector3.ProjectOnPlane(viewer.position - _captionAnchor.position, Vector3.up);
+            if (flat.sqrMagnitude < 1e-4f)
+                return _captionOffset;
+            _captionDirection = Vector3.Slerp(_captionDirection, flat.normalized, 1f - Mathf.Exp(-4f * Time.unscaledDeltaTime)).normalized;
+            var ahead = Mathf.Min(new Vector2(_captionOffset.x, _captionOffset.z).magnitude, Mathf.Max(0.3f, flat.magnitude - 0.4f));
+            return _captionDirection * ahead + Vector3.up * _captionOffset.y;
         }
 
         void LateUpdate()
         {
-            if (_anchor != null)
-                transform.position = _anchor.position + _offset;
+            if (_captionRoot != null)
+            {
+                var viewer = Viewer?.Invoke();
+                var position = _captionAnchor != null ? _captionAnchor.position + CaptionOffset(viewer) : _captionOffset;
+                var facing = viewer != null ? position - viewer.position : _captionRoot.forward;
+                _captionRoot.SetPositionAndRotation(position, facing.sqrMagnitude > 1e-6f ? Quaternion.LookRotation(facing, Vector3.up) : _captionRoot.rotation);
+            }
 
             if (Time.unscaledTime >= _nextRefresh)
             {
@@ -78,7 +115,7 @@ namespace ImmersiveX.Media
         }
 
         /// <summary>
-        /// Show <paramref name="caption"/> above the controls (narrated media), or nothing when it's null or empty.
+        /// Show <paramref name="caption"/> by the media (narrated media), or nothing when it's null or empty.
         /// </summary>
         public void SetCaption(string caption)
         {
@@ -87,11 +124,11 @@ namespace ImmersiveX.Media
             {
                 if (!show)
                     return;
-                var root = (RectTransform)transform.Find("Canvas");
-                _captionGlass = WorldUi.Rect(root, "Caption Glass", new Vector2(0f, Height * 0.5f + 52f), new Vector2(Width, 84f), new Color(0.03f, 0.045f, 0.07f, 0.78f));
+                var root = CaptionCanvas();
+                _captionGlass = WorldUi.Rect(root, "Caption Glass", Vector2.zero, new Vector2(Width, 84f), new Color(0.03f, 0.045f, 0.07f, 0.78f));
                 _captionGlass.sprite = UiSprites.Panel;
                 _captionGlass.type = Image.Type.Sliced;
-                _caption = WorldUi.Label(root, "Caption", string.Empty, 22, new Vector2(0f, Height * 0.5f + 52f), new Vector2(Width - 36f, 76f),
+                _caption = WorldUi.Label(root, "Caption", string.Empty, 22, Vector2.zero, new Vector2(Width - 36f, 76f),
                     FontStyle.Normal, TextAnchor.MiddleCenter);
             }
 
@@ -103,6 +140,27 @@ namespace ImmersiveX.Media
 
         /// <summary>The caption showing now, or null.</summary>
         public string Caption => _caption != null && _caption.gameObject.activeSelf ? _caption.text : null;
+
+        /// <summary>The caption's place in the world.</summary>
+        public Vector3 CaptionPosition => _captionRoot != null ? _captionRoot.position : PlaceOf(_captionAnchor, _captionOffset);
+
+        /// <summary>The media's name on the panel's tab.</summary>
+        public string Title => _title != null ? _title.text : null;
+
+        static Vector3 PlaceOf(Transform anchor, Vector3 offset) => anchor != null ? anchor.position + offset : offset;
+
+        /// <summary>The caption's own canvas: not a <see cref="PanelZones"/> zone, so hands still reach the media beside it.</summary>
+        RectTransform CaptionCanvas()
+        {
+            _captionRoot = new GameObject("Caption", typeof(RectTransform), typeof(Canvas)).transform;
+            _captionRoot.SetParent(transform, false);
+            _captionRoot.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            var root = (RectTransform)_captionRoot;
+            root.sizeDelta = new Vector2(Width, 84f);
+            root.localScale = Vector3.one * 0.001f;
+            LateUpdate();
+            return root;
+        }
 
         // ---------------------------------------------------------------- actions (also used by automation)
 
@@ -194,9 +252,14 @@ namespace ImmersiveX.Media
 
         // ---------------------------------------------------------------- building
 
-        void Build()
+        void Build(string title)
         {
-            var root = WorldUi.CreateCanvas(transform, new Vector2(Width, Height));
+            _panel = new GameObject("Panel").AddComponent<WithinReach>();
+            _panel.transform.SetParent(transform, false);
+            _panel.transform.localScale = Vector3.one * PanelScale;
+            _panel.Viewer = Viewer;
+            _panel.Hold = () => _seeking || _adjusting || (Hold != null && Hold());
+            var root = WorldUi.CreateCanvas(_panel.transform, new Vector2(Width, Height));
 
             var glass = root.Find("Background").GetComponent<Image>();
             glass.sprite = UiSprites.Panel;
@@ -223,6 +286,18 @@ namespace ImmersiveX.Media
             _speakerButton = _speakerIcon.GetComponentInParent<Button>();
             _volume = CreateSlider(root, "Volume", new Vector2(229f, -30f), new Vector2(104f, 30f), 22f);
             _volume.onValueChanged.AddListener(OnVolumeChanged);
+            var volumeEvents = _volume.gameObject.AddComponent<PressEvents>();
+            volumeEvents.Pressed = () => _adjusting = true;
+            volumeEvents.Released = () => _adjusting = false;
+
+            // A tab above the panel's left edge names what it plays, as the panel no longer stands by the media.
+            var tab = WorldUi.Rect(root, "Title Tab", new Vector2(-Width * 0.5f + 190f, Height * 0.5f + 26f), new Vector2(380f, 44f), new Color(0.03f, 0.045f, 0.07f, 0.62f));
+            tab.sprite = UiSprites.Panel;
+            tab.type = Image.Type.Sliced;
+            _title = WorldUi.Label(tab.transform, "Title", title ?? string.Empty, 24, Vector2.zero, new Vector2(352f, 40f),
+                FontStyle.Bold, TextAnchor.MiddleLeft);
+            _title.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _title.verticalOverflow = VerticalWrapMode.Truncate;
         }
 
         /// <summary>A solid white circle with a dark icon; returns the icon so it can change.</summary>

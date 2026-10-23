@@ -1,8 +1,9 @@
 // Draws a 4D mesh (see Mesh4DPlayable): the baked scene's own triangles, posed by a table of object matrices that
 // changes every frame, coloured from colour probes (through a texture atlas painted twice a second, or per vertex for
 // repeated fine meshes such as engines), with the scene's per-pixel rules: a cutaway wedge with a glowing edge, a door,
-// a set dissolving outward with a glowing front, front/back sides, and highlights. Colours are already lit: nothing is
-// relit here.
+// a set dissolving outward with a glowing front, front/back sides, and highlights; in version 3 also each object's own
+// cutaway (a plane or a wedge in its frame), a sphere dissolve with the scene's own noise, and the set dissolving at the
+// edge of the room while the stage follows its subject away. Colours are already lit: nothing is relit here.
 //
 // The renderer's transform takes the content's coordinates (three.js: right-handed, y up) into the room; object space
 // below means each baked object's own frame, where the cutaway and door are defined.
@@ -38,7 +39,10 @@ Shader "ImmersiveX/Mesh 4D"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
-            StructuredBuffer<float4> _Objects; // 5 per object: 3 matrix columns with the translation in w, (visible, highlight, flags, side), (first probe, flip, hull radius, -)
+            // 8 per object: 3 matrix columns with the translation in w, (visible, highlight, flags, side),
+            // (first probe, flip, hull radius, own cut level), then its own cut: (type, a), (ref, p0), (p1, glow width, -, -)
+            StructuredBuffer<float4> _Objects;
+            #define OBJ(o, k) _Objects[(o) * 8u + (k)]
             TEXTURE2D(_AtlasA);
             TEXTURE2D(_AtlasB);
             SAMPLER(sampler_AtlasA);
@@ -57,6 +61,9 @@ Shader "ImmersiveX/Mesh 4D"
             float4 _CutGlow;
             float4 _DissolveGlow;
             float _Ground; // the content's ground: what's below it is under the room's floor and isn't drawn
+            float _DissolveSphere; // version 3: the set dissolves inside a sphere around (C.x, centre y, C.y)
+            float4 _DissolveNoise; // scale, amplitude, glow width, centre y
+            float4 _Focus; // while the stage follows its subject: subject (x, z), radius, glow width (radius 0: off)
 
             struct Attributes
             {
@@ -89,7 +96,7 @@ Shader "ImmersiveX/Mesh 4D"
 
             float4x4 ObjectMatrix(uint o)
             {
-                float4 a = _Objects[o * 5u], b = _Objects[o * 5u + 1u], c = _Objects[o * 5u + 2u];
+                float4 a = OBJ(o, 0u), b = OBJ(o, 1u), c = OBJ(o, 2u);
                 return float4x4(a.x, b.x, c.x, a.w,
                                 a.y, b.y, c.y, b.w,
                                 a.z, b.z, c.z, c.w,
@@ -121,7 +128,7 @@ Shader "ImmersiveX/Mesh 4D"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
                 uint o = (uint)(input.obj.x + 0.5);
-                float4 info = _Objects[o * 5u + 3u];
+                float4 info = OBJ(o, 3u);
                 if (info.x < 0.5)
                     return Hidden(output); // not visible this frame
                 float4x4 m = ObjectMatrix(o);
@@ -133,7 +140,7 @@ Shader "ImmersiveX/Mesh 4D"
                 output.obj = o;
                 output.det = determinant((float3x3)m);
                 #if defined(MESH4D_PER_VERTEX)
-                float first = _Objects[o * 5u + 4u].x;
+                float first = OBJ(o, 4u).x;
                 float3 wf = input.weightsFront / max(dot(input.weightsFront, 1.0), 1e-4);
                 float3 wb = input.weightsBack / max(dot(input.weightsBack, 1.0), 1e-4);
                 output.colorFront = lerp(Blend3(_ProbesA, first, input.probesFront, wf), Blend3(_ProbesB, first, input.probesFront, wf), _KeyMix);
@@ -158,8 +165,8 @@ Shader "ImmersiveX/Mesh 4D"
             half4 Frag(Varyings input, FRONT_FACE_TYPE frontFace : FRONT_FACE_SEMANTIC) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                float4 info = _Objects[input.obj * 5u + 3u];
-                float4 info2 = _Objects[input.obj * 5u + 4u];
+                float4 info = OBJ(input.obj, 3u);
+                float4 info2 = OBJ(input.obj, 4u);
                 uint flags = (uint)(info.z + 0.5);
                 float cutGlow = 0.0, dissolveGlow = 0.0;
                 #if defined(MESH4D_RULES)
@@ -190,14 +197,56 @@ Shader "ImmersiveX/Mesh 4D"
                         discard;
                 }
 
+                // its own cutaway (version 3): a plane sweeping in, or a wedge opening about an axis
+                if ((flags & 64u) != 0u && info2.w > 0.001)
+                {
+                    float4 c5 = OBJ(input.obj, 5u), c6 = OBJ(input.obj, 6u), c7 = OBJ(input.obj, 7u);
+                    if (c5.x < 1.5)
+                    {
+                        float limit = lerp(c6.w, c7.x, info2.w), along = dot(input.local, c5.yzw);
+                        if (along > limit)
+                            discard;
+                        cutGlow = max(cutGlow, 1.0 - smoothstep(0.0, c7.y, limit - along));
+                    }
+                    else
+                    {
+                        float3 w = cross(c5.yzw, c6.xyz);
+                        float pu = dot(input.local, c6.xyz), pw = dot(input.local, w);
+                        float az = abs(atan2(pw, pu)), open = c7.x * info2.w;
+                        if (az < open)
+                            discard;
+                        cutGlow = max(cutGlow, 1.0 - smoothstep(0.0, c7.y, (az - open) * length(float2(pu, pw))));
+                    }
+                }
+
                 // the set dissolving outward from the subject
                 if ((flags & 4u) != 0u && _DissolveR > -50.0)
                 {
-                    float d = length(input.scene.xz - _DissolveC);
-                    float front = _DissolveR + (DissolveNoise(input.scene) - 0.5) * 14.0;
-                    if (d < front)
+                    if (_DissolveSphere > 0.5)
+                    {
+                        float d = length(input.scene - float3(_DissolveC.x, _DissolveNoise.w, _DissolveC.y));
+                        float front = _DissolveR - (ValueNoise(input.scene * _DissolveNoise.x) - 0.5) * _DissolveNoise.y;
+                        if (d < front)
+                            discard;
+                        dissolveGlow = 1.0 - smoothstep(0.0, _DissolveNoise.z, d - front);
+                    }
+                    else
+                    {
+                        float d = length(input.scene.xz - _DissolveC);
+                        float front = _DissolveR + (DissolveNoise(input.scene) - 0.5) * 14.0;
+                        if (d < front)
+                            discard;
+                        dissolveGlow = 1.0 - smoothstep(0.0, 2.5, d - front);
+                    }
+                }
+
+                // while the stage follows its subject away, what's left behind dissolves at the edge of the room
+                if ((flags & 16u) != 0u && _Focus.z > 0.0)
+                {
+                    float d = length(input.scene.xz - _Focus.xy) + (ValueNoise(input.scene * 0.7) - 0.5) * _Focus.w * 2.0;
+                    if (d > _Focus.z)
                         discard;
-                    dissolveGlow = 1.0 - smoothstep(0.0, 2.5, d - front);
+                    dissolveGlow = max(dissolveGlow, 1.0 - smoothstep(0.0, _Focus.w, _Focus.z - d));
                 }
 
                 #endif

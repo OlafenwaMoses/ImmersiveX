@@ -27,15 +27,15 @@ Every kind of content is placed the same way. Each section below adds what's spe
 
 1. **Add it to a scene in the build.** Media goes in as **Immersive Media** (Add Media, or the component by hand); your own Unity objects go in with **Make Immersive** (section 10). The first scene in **File ▸ Build Profiles** is the one the app opens. Save the scene.
 2. **Put it in order.** The content menu lists the scene's content in hierarchy order, top first: drag objects in the Hierarchy to reorder them (automation: `media first <name>`). With the menu on, one piece shows at a time: the first, until the user picks another (the app remembers the choice).
-3. **Choose where it first stands** (Immersive Media ▸ *Size and placement*):
-   - **Placement:** *Room Centre* (default): the centre of the mapped room, or in front of the user when no room is mapped. *In Front Of User*: **Distance From User** ahead (2 m by default).
+3. **Choose how it stands** (Immersive Media ▸ *Size and placement*). It always starts in front of the user, on the floor under them and facing them, when the app starts and whenever it's picked in the content menu:
+   - **Distance From User:** how far ahead (2 m by default).
    - **Height:** how tall standing content is, in metres (1.6 by default); its width follows. Flat video and photos use **Screen Height** (1 m) instead, and 360°/180° media surrounds the user.
    - **Up:** which way is up in the file, when it differs from the format's convention.
    - **Spot:** only when several pieces show at once (content menu off): 0 is the centre and 1 and up stand around it; −1 follows the hierarchy order.
    - Standing content stands on the floor and faces the user.
 4. **Choose how it plays** (*Playback*): **Play On Start** (off: it waits, paused, for Play), **Loop**, **Volume**, and **Frame Rate** for frame folders.
 5. **Choose what the user can do:** **Show Controls**, **Show Handles** and **Selectable Parts**.
-6. **Then the user places it.** It's anchored where it first stands. The user moves, turns and resizes it with its handles, or a hand, and it stays there through headset off/on and relaunches, held by a spatial anchor. Nothing moves it by itself after that.
+6. **Then the user places it.** It's anchored where it first stands. The user moves, turns and resizes it with its handles, or a hand, and it stays there through headset off/on, held by a spatial anchor. Nothing moves it by itself after that, until the next launch or pick in the content menu puts it in front of the user again.
 7. **Test it** in the Meta XR Simulator (**ImmersiveX ▸ Play Mode ▸ Meta XR Simulator (Quest)**, then Play): pick it from the content menu, play it, move it. Then build; the build's content check stops if anything is missing.
 
 ## At a glance
@@ -287,7 +287,7 @@ These formats can't load while the app runs, but Unity imports them in the edito
 
 **Placing it** (the **Immersive Content** component Make Immersive adds):
 - **Placement:** *In Front Of User* (default) puts it at **Offset From User** the first time: 0.8 m ahead and 15 cm below the eyes. *Keep Scene Position* starts it where it is in the scene.
-- Then the user moves it, and it stays where they leave it, held by a spatial anchor (its size too).
+- Then the user moves it, and it stays where they leave it, held by a spatial anchor (its size too), until the next launch or pick in the content menu puts it in front of them again.
 - It gets the handles and is listed in the content menu like media. **Selectable Parts** is off for Unity objects: turn it on when the object's meshes should be parts.
 
 To get Immersive Media's playback controls instead, export the model as GLB (for example from Blender) and add that.
@@ -363,11 +363,12 @@ MyScene/
 - **The name ends in `.sp4m`, not `.gz`.** Android's APK packer unzips `.gz` files and drops the extension, so the app couldn't find them. Add Media renames `name.sp4m.gz` to `name.sp4m` when it copies the folder (the player reads gzip either way), and the build check refuses a `.gz` name.
 - **How it shows:**
   - Standing in the room: the scene's ground on the floor, its stage as tall as **Height**, facing you.
-  - It plays on its soundtrack's clock with Immersive Media's controls (play/pause, seek, time, speaker). Captions show above the controls, and cards point at the parts when the content says.
+  - It plays on its soundtrack's clock with Immersive Media's controls (play/pause, seek, time, speaker). Captions show in front of the content, and cards point at the parts when the content says.
   - Its parts are selectable: a ray click selects one, a hand picks it up, and it keeps moving with the scene.
   - The colours are baked, so nothing is relit and it looks the same in every room. Soft effects (steam, smoke, fire) are baked Gaussians, drawn like a hologram.
-  - Things that fly away leave the room.
-- **Placing it:** Add Media with the folder. Its stage stands on the floor at **Height**, facing the user (the container says which side is its front). **Selectable Parts** gives the parts the container names. Its soundtrack is the clock.
+  - **When its subject drives or flies away, the stage follows it:** the subject (a rocket climbing, cars driving off) stays at the content's place at the same size, and what it leaves behind slides away and dissolves at the edge of the room, or sinks below the floor.
+- **Placing it:** Add Media with the folder. Its stage stands on the floor at **Height**, facing the user (the container says which side is its front). A container that says how tall it should stand (`stage.roomHeight`) sets **Height** for you. **Selectable Parts** gives the parts the container names. Its soundtrack is the clock.
+- **Versions:** version 2 is coloured through a texture atlas. Version 3 is coloured per vertex, gives each object its own cutaway, lists its colour keyframes' times, and can say how the stage follows its subject and how wide the piece gets. Version 4 is the hologram look: no colours at all, just each object's hue, gains, contour spacing and height span, drawn as light added over the room with a rim glow, contour lines, a scan band and a materialise front; its glow and how far it has materialised come per frame.
 - **Budget:** a two-minute scene of about 160 objects and 400,000 triangles is a container of about 50 MB. It loads in under a second on a Quest 3 and runs at 72 fps; the moments with the most effects close to the viewer are the heaviest.
 - **Won't play:** an animated GLB or a folder of GLB frames (section 5). Export the 4D mesh container from the pipeline instead.
 

@@ -47,6 +47,15 @@ namespace ImmersiveX
         /// <summary>The floor's pose this session.</summary>
         public Pose FloorPose => _room?.FloorPose ?? Pose.identity;
 
+        /// <summary>True while the room is being mapped (at start, or re-created from the content menu).</summary>
+        public bool IsMappingRoom => _room != null && _room.IsBusy;
+
+        /// <summary>True when <see cref="RescanRoom"/> would map the room again now.</summary>
+        public bool CanRescanRoom => State == SessionState.Ready && _room != null && !_room.IsBusy;
+
+        /// <summary>The room's floor-to-ceiling height from its last scan, or 0 when it isn't known.</summary>
+        public float CeilingHeight => _room?.LastRoom != null ? _room.LastRoom.CeilingHeight : 0f;
+
         /// <summary>One line describing the room mapping state, for status displays.</summary>
         public string RoomStatus => _room != null ? _room.Status
             : Platform != null && Platform.Capabilities.RoomData == RoomDataSource.None ? "This platform has no room data."
@@ -137,8 +146,10 @@ namespace ImmersiveX
             ImmersiveXLog.Info($"Tracking origin: {Origin.CurrentTrackingOriginMode} · camera offset {cameraOffset:0.00} m · " +
                                $"head at {Origin.Camera.transform.position.y:0.00} m");
             PlaceContent();
+            if (seeThrough != SeeThroughMode.None)
+                ViewModes.Create(this); // MR or VR: the menu's MR and VR buttons; every start is in MR
             if (Settings.ContentMenu)
-                ContentMenu.Create(Origin); // a fast sideways swipe opens it; one piece of content shows at a time
+                ContentMenu.Create(Origin).Open(); // open in front of the user at start; a fast sideways swipe opens it later
 
             Enter(SessionState.Ready);
         }

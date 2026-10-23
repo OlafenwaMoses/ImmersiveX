@@ -17,7 +17,7 @@ namespace ImmersiveX
         /// <summary>The content's height in metres. Setting it resizes the content (the target keeps it within its limits).</summary>
         float Height { get; set; }
 
-        /// <summary>The controls panel the move bar sits under, or null.</summary>
+        /// <summary>The controls panel the move bar sits under, or null. It may be away from the content, by the user.</summary>
         Transform Controls { get; }
 
         /// <summary>Move the content to <paramref name="position"/>, where it's allowed to be.</summary>
@@ -33,7 +33,9 @@ namespace ImmersiveX
     /// controller can use them as well as a hand at them (the content's body is only grabbed by hand, see
     /// <see cref="DirectGrabOnly"/>). Select one and drag:
     /// <list type="bullet">
-    /// <item>Move: slides the content across a level plane (the target keeps standing content inside the mapped room).</item>
+    /// <item>Move: slides the content across a level plane (the target keeps standing content inside the mapped room). The
+    /// bar sits under the content's controls, which stay by the user, so the content moves from within reach; a hand on
+    /// the bar carries it along while it drags.</item>
     /// <item>Turn (bars or ring): turns it about the up axis through its middle, like a turntable.</item>
     /// <item>Resize: drag up to make it bigger, down to make it smaller.</item>
     /// </list>
@@ -60,6 +62,7 @@ namespace ImmersiveX
         static readonly Color Hover = new Color(0.45f, 0.75f, 1f);
         const float DirectReach = 0.3f;
         const float MoveBarBelowControls = 0.17f;
+        const float MoveBarClearance = 0.075f; // under the panel's zone (its edge + PanelZones.Margin)
         const int RingSegments = 48;
         const float RingWidth = 0.022f;
 
@@ -83,6 +86,9 @@ namespace ImmersiveX
         float _startBottom;
         float _startHeight;
         Vector3 _lastPoint;
+        Vector3 _moveBarStart;
+        RectTransform _controlsZone;
+        Transform _controlsSeen;
         Vector3 _layoutSize = new Vector3(0.6f, 1.6f, 0.6f);
         Vector3 _layoutCentre = new Vector3(0f, 0.8f, 0f);
 
@@ -253,6 +259,7 @@ namespace ImmersiveX
             }
 
             _startPoint = PointerPoint(out var hit) && hit ? _lastPoint : grabPoint;
+            _moveBarStart = _move.Transform.position;
         }
 
         /// <summary>The point of the handle nearest the interactor (the ring is big; the bars are small).</summary>
@@ -382,17 +389,36 @@ namespace ImmersiveX
             _ring.Transform.localScale = new Vector3(radius, 1f, radius);
 
             // The move bar sits under the content's controls (like the bar under a Quest window), just outside the panel's
-            // zone, so a hand at the panel's buttons never reaches it.
+            // zone, so a hand at the panel's buttons never reaches it. Dragged by hand, it goes with the hand.
             var controls = _target.Controls;
-            if (controls != null && controls.gameObject.activeInHierarchy)
+            if (_active == _move && _direct)
             {
-                _move.Transform.SetPositionAndRotation(controls.position - controls.up * MoveBarBelowControls, controls.rotation);
+                _move.Transform.position = _moveBarStart + Vector3.ProjectOnPlane(_lastPoint - _startPoint, Vector3.up);
+            }
+            else if (controls != null && controls.gameObject.activeInHierarchy)
+            {
+                _move.Transform.SetPositionAndRotation(controls.position - controls.up * BelowControls(controls), controls.rotation);
             }
             else
             {
                 _move.Transform.localPosition = new Vector3(0f, -halfHeight + 0.08f, -(halfWidth + 0.25f));
                 _move.Transform.localRotation = Quaternion.identity;
             }
+        }
+
+        /// <summary>How far under the middle of <paramref name="controls"/> the move bar goes: clear of its zone, whatever its size.</summary>
+        float BelowControls(Transform controls)
+        {
+            if (_controlsSeen != controls)
+            {
+                _controlsSeen = controls;
+                var canvas = controls.GetComponentInChildren<Canvas>();
+                _controlsZone = canvas != null ? canvas.transform as RectTransform : null;
+            }
+
+            return _controlsZone != null
+                ? _controlsZone.rect.height * 0.5f * _controlsZone.lossyScale.y + PanelZones.Margin + MoveBarClearance
+                : MoveBarBelowControls;
         }
 
         static Transform Viewer()
