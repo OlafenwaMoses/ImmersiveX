@@ -52,6 +52,7 @@ namespace ImmersiveX.Platforms.MetaQuest
             {
                 Services.Register<IStreamAudioProvider>(new AndroidStreamAudioProvider());
                 Services.Register<IDeviceMenuProvider>(new MetaQuestDeviceMenu());
+                Services.Register<IPassthroughCameraProvider>(new MetaQuestPassthroughCamera()); // Quest 3 and 3S, for bare metal content
             }
         }
 

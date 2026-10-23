@@ -62,6 +62,9 @@ Add content with **ImmersiveX ▸ Media ▸ Add Media…** (a file, a folder or 
 
 [CONTENT_GUIDE.md](CONTENT_GUIDE.md) gives the structure each kind needs and what isn't supported yet; [docs/media.md](docs/media.md) covers the component.
 
+### Your own app, with ImmersiveX as its host
+**Bare metal content** is an app that owns everything: its menus, its layout, what it shows. ImmersiveX only connects it to the headset: permissions, the see-through view, no boundary, hands and controllers. It also gives the app the headset's camera (Quest 3 and 3S), ray casts against the real world, spatial anchors and the room. Nothing ties the app to a mapped room, so the user can walk anywhere. Start one with **ImmersiveX ▸ New Bare Metal Scene**; [docs/bare-metal.md](docs/bare-metal.md) covers the host.
+
 ### In the headset
 - **Controls:** every piece of content gets play/pause, seek, time and sound controls, plus handles to move, turn (bars and a ring) and resize it.
 - **Parts:** models, web scenes and 4D meshes have selectable parts. A ray click selects a part, a hand picks it up, and **Put back** returns it.
@@ -105,6 +108,7 @@ If settings ever drift, run **ImmersiveX ▸ Maintenance ▸ Apply Project Basel
 2. Add content:
    - **Media** (splats, 4D captures, models, video, photos, web pages, 4D meshes): **ImmersiveX ▸ Media ▸ Add Media…**, then save the scene.
    - **Your own Unity objects:** put them in `Assets/Content/`, drag them into `Assets/Scenes/Main.unity`, then right-click each one ▸ **ImmersiveX ▸ Make Immersive**. (New scenes: **ImmersiveX ▸ New Scene**.)
+   - **Your own app, with ImmersiveX only as its host:** **ImmersiveX ▸ New Bare Metal Scene**, then put your code on its app object ([bare metal content](docs/bare-metal.md)).
    - **Where it stands and how it plays** (order in the menu, Placement, Height, Up, Play On Start): see [Placing content in the app](CONTENT_GUIDE.md#placing-content-in-the-app). Web experiences are best added by an AI coding agent that tests them in the simulator ([section 12](CONTENT_GUIDE.md#adding-a-web-experience-with-an-ai-coding-agent-recommended)).
 3. Try it without a headset:
    - **ImmersiveX ▸ Play Mode ▸ Meta XR Simulator (Quest)** or **XR Simulation (any device)**
