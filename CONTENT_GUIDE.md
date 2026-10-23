@@ -55,6 +55,7 @@ Every kind of content is placed the same way. Each section below adds what's spe
 | [Vendor volumetric formats](#11-vendor-volumetric-formats) | `.4ds`, `.oms`, `.vols` | — | Need an adapter (code) |
 | [Web experiences](#12-web-experiences-threejs-pages) | A three.js page: `.html`, a folder with `index.html`, or a URL | One self-contained file, or a folder | Its 3D scene in the room, its own controls on a panel |
 | [4D meshes](#13-4d-meshes-sp4m) | A `.sp4m` container, with its soundtrack | A folder | Standing, animated, narrated: captions and cards that point at its parts |
+| [Bare metal content](#14-bare-metal-content-your-own-app) | Your own app: Unity code on a **Bare Metal Content** object | A scene from **New Bare Metal Scene** | However the app decides: ImmersiveX only hosts it |
 
 Every Immersive Media gets the same acrylic controls (play/pause, seek, time, speaker, volume) and handles around it (a move bar, turn bars and a turn ring, a resize corner). Each stays where you put it, held by a spatial anchor. Web experiences are the exception for controls: they bring their own player (section 12).
 
@@ -372,6 +373,16 @@ MyScene/
 - **Budget:** a two-minute scene of about 160 objects and 400,000 triangles is a container of about 50 MB. It loads in under a second on a Quest 3 and runs at 72 fps; the moments with the most effects close to the viewer are the heaviest.
 - **Won't play:** an animated GLB or a folder of GLB frames (section 5). Export the 4D mesh container from the pipeline instead.
 
+## 14. Bare metal content (your own app)
+An app that owns everything, with ImmersiveX only as its host: its own menus, what it shows and where, and how the user moves about. ImmersiveX connects it to the headset and stays out of the way. [docs/bare-metal.md](docs/bare-metal.md) covers the host in full.
+- **Bring** Unity code: components on an object with **Bare Metal Content**. **ImmersiveX ▸ New Bare Metal Scene** makes the scene, with that object ready. The component that starts the app implements `IBareMetalApp`, whose `OnHostReady` runs once the headset is ready.
+- **What the host still does:** permissions, the see-through view, hiding the boundary, hands and controllers.
+- **What it leaves out:** the content menu, the room-mapping prompt at start, placing content in front of the user and the MR/VR switch. Nothing ties the app to a mapped room, so the user can walk anywhere. The app turns any of these on when it wants them: **Content Menu** and **Map Room At Start** on the component, or `ImmersiveHost.MapRoom()` and `ImmersiveHost.SetView()` from code.
+- **What the app gets** (`ImmersiveHost`): the head, the user and the floor; tracked hands and the content menu's swipe gestures; ray casts against the real world (depth on Quest 3 and 3S, the room's planes and furniture) and the app's colliders; the headset's camera, with rays through any point of a picture; spatial anchors; the view mode; the system menu.
+- **The camera** (Quest 3 and 3S, Horizon OS v74 or later): turn on **Passthrough Camera** on the component. The build then gets the camera permissions, and the user is asked at start. Apps without it get no camera permission at all. In the editor a simulated camera sees the app's own scene.
+- **Placing it:** the app places everything itself. `ImmersiveHost.UserPose` and `FloorHeight` say where the user is, and `ImmersiveHost.KeepInPlace` keeps an object where it's put, held by a spatial anchor.
+- **Test it** in the Meta XR Simulator as usual. The automation's `host` commands drive it (`host status`, `host capture`, `host raycast`, `host press <button>` …). **Host Check** (`Assets/Demos/BareMetal`) is a small example app.
+
 ---
 
 ## Checklist before you add content
@@ -384,6 +395,7 @@ MyScene/
 - [ ] Video is H.264 (or H.265 tagged `hvc1`) in MP4/MOV, or VP8 in WebM. Photos are JPG or PNG.
 - [ ] Web pages: made with three.js, and either one self-contained `.html` or a folder with `index.html` whose files are linked by relative paths.
 - [ ] 4D meshes: a folder with the `.sp4m` container (not named `.gz`) and its soundtrack.
+- [ ] Bare metal apps: a scene from **New Bare Metal Scene**, an `IBareMetalApp` on the app object, and **Passthrough Camera** on if the app reads the cameras.
 - [ ] The size is reasonable for the app, and you're allowed to ship it.
 - [ ] Placed as you want: its order in the scene, and its **Placement**, **Height** and **Up** (section [Placing content in the app](#placing-content-in-the-app)).
 - [ ] Web experiences: added and tested by a coding agent in the Meta XR Simulator (section 12).

@@ -264,14 +264,14 @@ namespace ImmersiveX
             }
         }
 
-        static async Awaitable EnterStore()
+        internal static async Awaitable EnterStore()
         {
             while (s_storeBusy)
                 await Awaitable.NextFrameAsync();
             s_storeBusy = true;
         }
 
-        static void LeaveStore() => s_storeBusy = false;
+        internal static void LeaveStore() => s_storeBusy = false;
 
         /// <summary>Erase saved anchors from the device (for example when their room is forgotten).</summary>
         public static async void EraseSaved(IReadOnlyCollection<string> anchorIds)
@@ -334,7 +334,7 @@ namespace ImmersiveX
         }
 
         /// <summary>The session's anchor manager, when it's running.</summary>
-        static ARAnchorManager Manager()
+        internal static ARAnchorManager Manager()
         {
             var session = ImmersiveXSession.Instance;
             var manager = session != null && session.Origin != null ? session.Origin.GetComponent<ARAnchorManager>() : null;

@@ -16,3 +16,4 @@ Copy [`template.md`](template.md), take the next number, and link it below.
 | [0008](0008-nda-platforms-as-stubs.md) | NDA platforms ship as stubs in the public repo | Accepted |
 | [0009](0009-shader-graph-for-hologram-shader.md) | Hologram shader authored in Shader Graph | Accepted |
 | [0010](0010-xri-for-interaction.md) | XR Interaction Toolkit for interaction in core | Accepted |
+| [0011](0011-bare-metal-content.md) | Host whole apps as bare metal content | Accepted |

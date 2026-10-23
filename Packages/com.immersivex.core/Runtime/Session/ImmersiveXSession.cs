@@ -13,6 +13,8 @@ namespace ImmersiveX
     /// Runs the ImmersiveX start-up flow: pick the platform, ask for permissions, turn on see-through,
     /// prepare the room, then place content in front of the user. Put one in any scene with an XR Origin
     /// (<b>ImmersiveX ▸ New Scene</b> does this for you).
+    /// With <see cref="BareMetalContent"/> in the scene it's only the host: it does the headset's groundwork and leaves the
+    /// room, the menus and the layout to the app (see <see cref="SessionPlan"/>).
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(-1000)]
@@ -29,6 +31,12 @@ namespace ImmersiveX
         public PlatformAdapter Platform { get; private set; }
         public XROrigin Origin { get; private set; }
         public ImmersiveXSettings Settings { get; private set; }
+
+        /// <summary>The scene's bare metal content (the app ImmersiveX hosts), or null.</summary>
+        public BareMetalContent BareMetal { get; private set; }
+
+        /// <summary>What this session sets up.</summary>
+        public SessionPlan Plan { get; private set; }
 
         /// <summary>True when the user allowed access to room data (planes, furniture).</summary>
         public bool HasRoomAccess { get; private set; }
@@ -50,7 +58,7 @@ namespace ImmersiveX
         /// <summary>True while the room is being mapped (at start, or re-created from the content menu).</summary>
         public bool IsMappingRoom => _room != null && _room.IsBusy;
 
-        /// <summary>True when <see cref="RescanRoom"/> would map the room again now.</summary>
+        /// <summary>True when <see cref="RescanRoom"/> (or <see cref="MapRoom"/>) would map the room now.</summary>
         public bool CanRescanRoom => State == SessionState.Ready && _room != null && !_room.IsBusy;
 
         /// <summary>The room's floor-to-ceiling height from its last scan, or 0 when it isn't known.</summary>
@@ -68,6 +76,7 @@ namespace ImmersiveX
         public event Action<MappedSpace> SpaceReady;
 
         RoomMappingFlow _room;
+        List<Behaviour> _roomManagers;
 
         void Awake()
         {
@@ -92,6 +101,10 @@ namespace ImmersiveX
             Settings = ImmersiveXSettings.Load();
             Services.Clear();
             ImmersiveXLog.Info($"Started on {SystemInfo.deviceModel} · {SystemInfo.operatingSystem} · {Application.identifier} {Application.version}");
+            BareMetal = FindAnyObjectByType<BareMetalContent>();
+            Plan = SessionPlan.For(BareMetal, Settings);
+            if (BareMetal != null)
+                ImmersiveXLog.Info($"Bare metal: {BareMetal.Describe()}");
 
             Origin = FindAnyObjectByType<XROrigin>();
             if (Origin == null)
@@ -119,25 +132,34 @@ namespace ImmersiveX
                 // for seated VR) would lift the camera above the real floor, so room content would sit below it and drift.
                 Origin.CameraYOffset = 0f;
             }
-            var roomManagers = PrepareArFoundation();
+            _roomManagers = PrepareArFoundation();
 
             Enter(SessionState.Permissions);
-            yield return RequestRoomAccess();
+            if (Plan.RoomAccess)
+                yield return RequestRoomAccess();
+            else
+                ImmersiveXLog.Info("Room access: not asked (the bare metal content doesn't use room data).");
+            if (Plan.IsBareMetal && HasRoomAccess)
+                GetOrAdd<ARRaycastManager>(Origin.gameObject); // depth and room ray casts (ImmersiveHost.Raycast); Quest needs room access first
+            if (Plan.CameraAccess)
+                yield return RequestCameraAccess();
 
             Enter(SessionState.SeeThrough);
             var seeThrough = Platform.Capabilities.SeeThrough;
             SeeThrough.Apply(Origin.Camera, seeThrough);
             if (seeThrough != SeeThroughMode.None && Settings.DisableLocomotionInSeeThrough)
                 DisableLocomotion();
-            yield return HideBoundaryIfSupported();
+            if (Plan.HideBoundary)
+                yield return HideBoundaryIfSupported();
 
             Enter(SessionState.Space);
             if (HasRoomAccess && Platform.Capabilities.RoomData != RoomDataSource.None)
             {
-                _room = new RoomMappingFlow(this, (ARPlaneManager)roomManagers[0], (ARBoundingBoxManager)roomManagers[1], new SpaceLibrary());
-                yield return _room.Map(rescan: false);
-                if (_room.Space != null)
-                    SpaceReady?.Invoke(_room.Space);
+                _room = new RoomMappingFlow(this, (ARPlaneManager)_roomManagers[0], (ARBoundingBoxManager)_roomManagers[1], new SpaceLibrary());
+                if (Plan.MapRoomAtStart)
+                    yield return MapRoutine(rescan: false);
+                else
+                    ImmersiveXLog.Info("Room: not mapped at start (the bare metal content maps it when it wants: ImmersiveHost.MapRoom).");
             }
 
             Enter(SessionState.Content);
@@ -145,13 +167,17 @@ namespace ImmersiveX
             var cameraOffset = Origin.CameraFloorOffsetObject != null ? Origin.CameraFloorOffsetObject.transform.localPosition.y : 0f;
             ImmersiveXLog.Info($"Tracking origin: {Origin.CurrentTrackingOriginMode} · camera offset {cameraOffset:0.00} m · " +
                                $"head at {Origin.Camera.transform.position.y:0.00} m");
-            PlaceContent();
-            if (seeThrough != SeeThroughMode.None)
+            if (Plan.PlaceContent)
+                PlaceContent();
+            if (seeThrough != SeeThroughMode.None && Plan.ViewModes)
                 ViewModes.Create(this); // MR or VR: the menu's MR and VR buttons; every start is in MR
-            if (Settings.ContentMenu)
+            if (Plan.ContentMenu)
                 ContentMenu.Create(Origin).Open(); // open in front of the user at start; a fast sideways swipe opens it later
 
             Enter(SessionState.Ready);
+            ImmersiveHost.NotifyReady();
+            if (BareMetal != null)
+                BareMetal.NotifyHostReady();
         }
 
         /// <summary>Map the room again (Quest: Space Setup) and update the saved room. Only while Ready.</summary>
@@ -159,14 +185,48 @@ namespace ImmersiveX
         {
             if (State != SessionState.Ready || _room == null || _room.IsBusy)
                 return;
-            StartCoroutine(RescanRoutine());
+            StartCoroutine(MapRoutine(rescan: true));
         }
 
-        IEnumerator RescanRoutine()
+        /// <summary>
+        /// Map the room now, as at start: a known room loads, a new one is mapped (Quest: Space Setup). For bare metal content
+        /// that doesn't map it at start. Only while Ready, with room access. Returns true when mapping started.
+        /// </summary>
+        public bool MapRoom()
         {
-            yield return _room.Map(rescan: true);
+            if (_room == null)
+            {
+                ImmersiveXLog.Warn("Room: can't map it without room access, or on a platform without room data.");
+                return false;
+            }
+
+            if (State != SessionState.Ready || _room.IsBusy)
+                return false;
+            StartCoroutine(MapRoutine(rescan: false));
+            return true;
+        }
+
+        IEnumerator MapRoutine(bool rescan)
+        {
+            yield return _room.Map(rescan);
             if (_room.Space != null)
                 SpaceReady?.Invoke(_room.Space);
+        }
+
+        IEnumerator RequestCameraAccess()
+        {
+            var camera = ImmersiveHost.PassthroughCamera;
+            if (!camera.IsSupported)
+            {
+                ImmersiveXLog.Info($"Camera: {camera.Status}.");
+                yield break;
+            }
+
+            bool? granted = null;
+            camera.RequestAccess(result => granted = result);
+            while (granted == null)
+                yield return null;
+            ImmersiveXLog.Info($"Camera: access {(granted.Value ? "granted" : "denied")} ({camera.Provider.Name}).");
         }
 
         /// <summary>Delete ImmersiveX's saved copy of the current room.</summary>
