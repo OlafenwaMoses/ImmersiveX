@@ -125,6 +125,7 @@ Quest builds already follow Meta's release manifest rules:
 - install location `auto`;
 - a landscape launch activity, excluded from recents;
 - Meta's device identifiers and default device targets (Quest 2 and later);
+- app data not backed up (`android:allowBackup="false"`), as the store's security review asks;
 - not debuggable.
 
 What you add:
