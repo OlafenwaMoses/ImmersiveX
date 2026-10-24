@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ImmersiveX.Editor;
 using UnityEditor;
+using UnityEditor.Android;
 using UnityEditor.Build;
 using UnityEditor.XR.OpenXR;
 using UnityEditor.XR.OpenXR.Features;
@@ -29,6 +30,9 @@ namespace ImmersiveX.Platforms.MetaQuest.Editor
         // Unity OpenXR: Meta's "Meta Quest" feature set. Enabling it (as the Project Settings checkbox does) also
         // enables its required features, including Composition Layers Support, which draws passthrough.
         const string MetaFeatureSetId = "com.unity.openxr.featureset.meta";
+
+        /// <summary>The app's icon, as the headset's app library shows it.</summary>
+        internal const string IconPath = "Assets/Branding/Logo.png";
 
         public string PlatformId => "metaquest";
         public string DisplayName => "Meta Quest";
@@ -60,6 +64,8 @@ namespace ImmersiveX.Platforms.MetaQuest.Editor
             var layers = settings.GetFeature<OpenXRCompositionLayersFeature>();
             if (layers == null || !layers.enabled)
                 issues.Add("Error: Composition Layers Support is off, so passthrough can't be drawn. Run Configure.");
+            if (AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath) == null)
+                issues.Add($"Warning: there's no app icon at {IconPath}, so the app library shows a blank one.");
             return issues;
         }
 
@@ -76,6 +82,7 @@ namespace ImmersiveX.Platforms.MetaQuest.Editor
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft; // Meta Horizon Store: screenOrientation "landscape"
             EditorUserBuildSettings.androidBuildSubtarget = MobileTextureSubtarget.ASTC;
             EditorUserBuildSettings.buildAppBundle = false;
+            ConfigureIcon();
 
             // GPU skinning keeps the animated hand meshes off the CPU (on in the Quest-proven VizionEnterprise project).
             var player = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset")[0]);
@@ -84,6 +91,34 @@ namespace ImmersiveX.Platforms.MetaQuest.Editor
             {
                 gpuSkinning.boolValue = true;
                 player.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        /// <summary>
+        /// The logo as the app's icon: the default icon and the Android launcher icons the app library shows.
+        /// Square and round only: an adaptive icon is cropped to its centre, which would cut off the wordmark.
+        /// </summary>
+        static void ConfigureIcon()
+        {
+            var logo = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
+            if (logo == null)
+                return; // Validate reports it
+            if (AssetImporter.GetAtPath(IconPath) is TextureImporter importer &&
+                (importer.textureCompression != TextureImporterCompression.Uncompressed || importer.mipmapEnabled))
+            {
+                importer.textureCompression = TextureImporterCompression.Uncompressed; // icons are scaled from it: keep it clean
+                importer.mipmapEnabled = false;
+                importer.SaveAndReimport();
+                logo = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
+            }
+
+            PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { logo }, IconKind.Any);
+            foreach (var kind in new[] { AndroidPlatformIconKind.Legacy, AndroidPlatformIconKind.Round })
+            {
+                var icons = PlayerSettings.GetPlatformIcons(NamedBuildTarget.Android, kind);
+                foreach (var icon in icons)
+                    icon.SetTexture(logo);
+                PlayerSettings.SetPlatformIcons(NamedBuildTarget.Android, kind, icons);
             }
         }
 
