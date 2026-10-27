@@ -24,7 +24,7 @@ namespace ImmersiveX.Editor
     /// <item><c>invoke rescan|forget|showarea|saveanchor|loadanchor|eraseanchor|scandone|scanskip</c>: press a Device Check or scan button</item>
     /// <item><c>invoke vr|mr|view</c>: switch to VR or MR as the content menu's buttons do, or say which is on</item>
     /// <item><c>invoke reach</c>: what each hand and controller could grab from where it is now (rays only click) · <c>invoke uirays</c>: can a ray click every panel button</item>
-    /// <item><c>contentmenu status|open|close|toggle|select &lt;n&gt;|scroll up|down [rows]|space|back|recreate|device|swipe right|left|both</c> (or <c>cm …</c>): the content menu</item>
+    /// <item><c>contentmenu status|open|close|toggle|select &lt;n&gt;|scroll up|down [rows]|space|back|recreate|device|swipe right|left|both</c> (or <c>cm …</c>): the content menu (<c>select</c> an app to open its page; <c>back</c> from Space or an app's page)</item>
     /// <item><c>prompt primary|secondary</c>: press a button on the ImmersiveX prompt that's showing</item>
     /// <item><c>turn &lt;degrees&gt; &lt;seconds&gt;</c>: turn the rig on the spot (Play mode) to test the guided look-around's coverage and coaching</item>
     /// <item>Commands other packages register with <see cref="RegisterCommand"/>, e.g. ImmersiveX Media's <c>media …</c> and <c>demo</c></item>
@@ -556,7 +556,12 @@ namespace ImmersiveX.Editor
                         float.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture), float.Parse(parts[3], System.Globalization.CultureInfo.InvariantCulture));
                     break;
                 case "space": menu.OpenSpace(); note = $"Space panel: {menu.Space.Says}. "; break; // the footer's Space button
-                case "back": menu.BackFromSpace(); break;
+                case "back": // the Space panel's Back, or an app page's Content (back to the list)
+                    if (menu.Space != null && menu.Space.IsShowing)
+                        menu.BackFromSpace();
+                    else
+                        menu.BackToContent();
+                    break;
                 case "recreate": menu.RecreateSpace(); break; // the Space panel's Re-create space
                 case "scroll": // "contentmenu scroll <up|down> [rows]": what the scroll buttons do
                     if (parts.Length < 2 || (parts[1] != "up" && parts[1] != "down"))
@@ -566,7 +571,7 @@ namespace ImmersiveX.Editor
                 case "select":
                     if (parts.Length < 2 || !int.TryParse(parts[1], out var n) || menu.ItemAt(n - 1) == null)
                         throw new ArgumentException($"Usage: menu select <1-{menu.Items.Count}>");
-                    menu.ShowOnly(menu.ItemAt(n - 1));
+                    menu.Pick(menu.ItemAt(n - 1)); // as its row does: an app opens its page
                     break;
                 case "swipe": // "contentmenu swipe <right|left|both> [back]": the opening swipe, or its reverse with "back"
                     var which = parts.Length > 1 ? parts[1].ToLowerInvariant() : "right";

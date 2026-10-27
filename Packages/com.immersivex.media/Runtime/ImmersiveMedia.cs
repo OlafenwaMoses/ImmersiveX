@@ -155,6 +155,13 @@ namespace ImmersiveX.Media
             set => _source = value;
         }
 
+        /// <summary>Its name: on the controls' tab, in the content menu and in logs (the file's name when it's empty).</summary>
+        public string Title
+        {
+            get => Name;
+            set => _title = value ?? string.Empty;
+        }
+
         public MediaFormat Format
         {
             get => _format;

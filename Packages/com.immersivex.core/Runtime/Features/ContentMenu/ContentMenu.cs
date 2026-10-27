@@ -24,6 +24,9 @@ namespace ImmersiveX
     /// <item>It opens in front of the user when the app starts.</item>
     /// <item>Its <b>Space</b> button (a green dot when the room is saved, amber when not) opens <see cref="SpacePanel"/>: what's
     /// saved about the room, with Re-create space (map it again; the menu comes back when that's done) and Back.</item>
+    /// <item>Picking a <see cref="ContentApp"/> (LearnX, say) shows it and turns the menu to its page
+    /// (<see cref="ContentAppPage"/>); the page's <b>Content</b> button comes back to the list. While an app is showing, the
+    /// opening swipe opens its page. What an app puts in the room is its own, so it isn't listed here.</item>
     /// </list>
     /// <see cref="ImmersiveXSession"/> adds it when the session is ready (Settings: Content Menu).
     /// </summary>
@@ -80,6 +83,8 @@ namespace ImmersiveX
         readonly List<ModeButton> _modeButtons = new List<ModeButton>();
         ViewModes _modes;
         SpacePanel _space;
+        ContentAppPage _page;
+        bool _inApp; // the menu is on the showing app's page (it opens there) rather than the list
         Image _spaceDot;
         bool _awaitingScan;
         XROrigin _origin;
@@ -89,13 +94,16 @@ namespace ImmersiveX
         int _first; // the item in the top row
         int _builtFor = -1;
 
-        public bool IsOpen => (_panel != null && _panel.activeSelf) || (_space != null && _space.IsShowing);
+        public bool IsOpen => (_panel != null && _panel.activeSelf) || (_space != null && _space.IsShowing) || (_page != null && _page.IsOpen);
 
         /// <summary>The Space panel, once it has been opened.</summary>
         public SpacePanel Space => _space;
 
-        /// <summary>The menu's panel (automation and tests move it about).</summary>
-        public Transform Panel => _panel != null ? _panel.transform : null;
+        /// <summary>The menu's panel: an app's page when that's open, else the list (automation and tests move it about).</summary>
+        public Transform Panel => _page != null && _page.IsOpen ? _page.Panel.transform : _panel != null ? _panel.transform : null;
+
+        /// <summary>The showing app's page, while the menu is on it (open or not), or null on the list.</summary>
+        public ContentAppPage AppPage => _inApp ? _page : null;
         public IReadOnlyList<IContentItem> Items => _items;
         public IContentItem Shown { get; private set; }
         public HandSwipes Swipes => _swipes;
@@ -126,6 +134,7 @@ namespace ImmersiveX
             };
             menu.FindItems();
             menu.ShowOnly(menu.Remembered() ?? menu._items.FirstOrDefault());
+            menu._inApp = menu.Shown is ContentApp; // an app that was showing opens on its page
             return menu;
         }
 
@@ -171,13 +180,21 @@ namespace ImmersiveX
             var head = Viewer();
             if (!IsOpen || head == null)
                 return false;
-            var toPanel = _panel.transform.position - head.position;
+            var toPanel = Panel.position - head.position;
             return toPanel.magnitude <= InFrontWithin && Vector3.Angle(head.forward, toPanel) <= InFrontAngle;
         }
 
         public void Open()
         {
             FindItems();
+            if (_inApp && Shown is ContentApp app)
+            {
+                OpenApp(app, inFront: true);
+                return;
+            }
+
+            if (_page != null)
+                _page.Panel.SetActive(false);
             if (_space != null)
                 _space.Hide();
             _first = ClampFirst(_first);
@@ -186,7 +203,7 @@ namespace ImmersiveX
                 _first = ClampFirst(shown - RowsPerPage / 2); // the content that's showing is in view when the menu opens
             Build();
             Paint();
-            Place();
+            Place(_panel.transform);
             _panel.SetActive(true);
         }
 
@@ -194,9 +211,80 @@ namespace ImmersiveX
         {
             if (!IsOpen)
                 return;
-            _panel.SetActive(false);
+            if (_panel != null)
+                _panel.SetActive(false);
+            if (_page != null)
+                _page.Panel.SetActive(false);
             if (_space != null)
                 _space.Hide();
+        }
+
+        // ---------------------------------------------------------------- apps
+
+        /// <summary>What a row does: an app opens its page; anything else just shows.</summary>
+        public void Pick(IContentItem item)
+        {
+            if (item is ContentApp app)
+                OpenApp(app);
+            else
+                ShowOnly(item);
+        }
+
+        /// <summary>
+        /// Show <paramref name="app"/> and turn the menu to its page: where the menu is, or in front of the user when it's
+        /// closed or <paramref name="inFront"/> (the opening swipe). The first time, the app draws its first view.
+        /// </summary>
+        public void OpenApp(ContentApp app, bool inFront = false)
+        {
+            if (app == null)
+                return;
+            var at = IsOpen && !inFront ? new Pose(Panel.position, Panel.rotation) : (Pose?)null;
+            if (Shown != (IContentItem)app)
+                ShowOnly(app);
+            _inApp = true;
+            if (_page != null && _page.App != app)
+            {
+                _page.Destroy();
+                _page = null;
+            }
+
+            var first = _page == null;
+            if (first)
+            {
+                _page = new ContentAppPage(this, app);
+                app.Page = _page;
+            }
+
+            if (_panel != null)
+                _panel.SetActive(false);
+            if (_space != null)
+                _space.Hide();
+            if (at.HasValue)
+                _page.Panel.transform.SetPositionAndRotation(at.Value.position, at.Value.rotation);
+            else
+                Place(_page.Panel.transform);
+            _page.Panel.SetActive(true);
+            if (first)
+                app.OnPageOpened(_page);
+            ImmersiveXLog.Info($"Content menu: {app.Title}'s page{(_page.Title != null ? $" · {_page.Title}" : string.Empty)}.");
+        }
+
+        /// <summary>From an app's page back to the list, where the page was (the app stays showing).</summary>
+        public void BackToContent()
+        {
+            var at = _page != null && _page.IsOpen ? new Pose(_page.Panel.transform.position, _page.Panel.transform.rotation) : (Pose?)null;
+            _inApp = false;
+            if (_page != null)
+                _page.Panel.SetActive(false);
+            if (!at.HasValue)
+                return;
+            FindItems();
+            _first = ClampFirst(_first);
+            Build();
+            Paint();
+            _panel.transform.SetPositionAndRotation(at.Value.position, at.Value.rotation);
+            _panel.SetActive(true);
+            ImmersiveXLog.Info("Content menu: back to the content.");
         }
 
         // ---------------------------------------------------------------- the room's space
@@ -251,14 +339,14 @@ namespace ImmersiveX
         }
 
         /// <summary>In front of the user's eyes, close to the headset, a little below eye level, facing them.</summary>
-        void Place()
+        void Place(Transform panel)
         {
             var head = Viewer();
             if (head == null)
                 return;
             var forward = Vector3.ProjectOnPlane(head.forward, Vector3.up);
             forward = forward.sqrMagnitude > 1e-4f ? forward.normalized : Vector3.forward;
-            _panel.transform.SetPositionAndRotation(head.position + forward * OpenDistance - Vector3.up * OpenBelowEyes, Quaternion.LookRotation(forward, Vector3.up));
+            panel.SetPositionAndRotation(head.position + forward * OpenDistance - Vector3.up * OpenBelowEyes, Quaternion.LookRotation(forward, Vector3.up));
         }
 
         // ---------------------------------------------------------------- content
@@ -267,6 +355,13 @@ namespace ImmersiveX
         public void ShowOnly(IContentItem item)
         {
             FindItems();
+            if (_page != null && (IContentItem)_page.App != item)
+            {
+                if (_page.IsOpen)
+                    BackToContent(); // another piece of content is showing now: the list, not the old app's page
+                _inApp = false;
+            }
+
             foreach (var other in _items)
                 if (other != item && other.IsShown)
                     other.SetShown(false);
@@ -291,8 +386,8 @@ namespace ImmersiveX
         {
             _items.Clear();
             foreach (var behaviour in FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None))
-                if (behaviour is IContentItem item)
-                    _items.Add(item);
+                if (behaviour is IContentItem item && !ContentApp.BelongsToAnApp(behaviour))
+                    _items.Add(item); // an app's own content (LearnX's lesson media) is the app's to show
             _items.Sort((a, b) => Compare(HierarchyPath(((MonoBehaviour)a).transform), HierarchyPath(((MonoBehaviour)b).transform)));
             if (Shown != null && !_items.Contains(Shown))
                 Shown = null;
@@ -405,7 +500,7 @@ namespace ImmersiveX
             button.onClick.AddListener(() =>
             {
                 if (row.Item != null)
-                    ShowOnly(row.Item);
+                    Pick(row.Item);
             });
             row.Title = WorldUi.Label(box, "Title", string.Empty, 22, new Vector2(-46f, 11f), new Vector2(size.x - 130f, 30f), FontStyle.Bold, TextAnchor.MiddleLeft);
             row.Kind = WorldUi.Label(box, "Kind", string.Empty, 16, new Vector2(-46f, -15f), new Vector2(size.x - 130f, 24f), FontStyle.Normal, TextAnchor.MiddleLeft);
@@ -588,6 +683,7 @@ namespace ImmersiveX
             (Scrolls ? $"scrolls: rows {_first + 1}–{Mathf.Min(_items.Count, _first + RowsPerPage)} in view · " : string.Empty) +
             (_modes != null ? $"view {(_modes.Mode == ViewMode.Virtual ? "VR" : "MR")} · " : string.Empty) +
             $"space {(ImmersiveXSession.Instance != null && ImmersiveXSession.Instance.CurrentSpace != null ? "saved" : "not saved")}{(_space != null && _space.IsShowing ? " (Space panel open)" : string.Empty)} · " +
+            (AppPage != null ? $"on {AppPage.App.Title}'s page{(AppPage.Title != null ? $" ('{AppPage.Title}', back: {AppPage.Back})" : string.Empty)} · " : string.Empty) +
             $"swipes recognised: {(_swipes != null ? _swipes.Count : 0)}";
 
         Transform Viewer() =>

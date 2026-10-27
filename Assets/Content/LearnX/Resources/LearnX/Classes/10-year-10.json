@@ -1,0 +1,86 @@
+{
+  "id": "year-10",
+  "order": 10,
+  "name": "Year 10",
+  "stage": "Key stage 4",
+  "ages": "14 to 15",
+  "note": "GCSE courses usually start in Year 10.",
+  "lessons": [
+    {
+      "id": "year-10-a-christmas-carol",
+      "subject": "English literature",
+      "title": "A Christmas Carol",
+      "summary": "Explore how Scrooge changes, and what Dickens wanted readers to learn.",
+      "curriculum": "GCSE English literature: a 19th-century novel",
+      "pages": [
+        "Charles Dickens published ‘A Christmas Carol’ in 1843. It follows Ebenezer Scrooge, a mean and lonely businessman in London.",
+        "The ghost of Scrooge's dead business partner, Jacob Marley, warns him to change. Then 3 spirits visit: the Ghosts of Christmas Past, Present and Yet to Come.",
+        "Scrooge sees the poor but loving Cratchit family, and the illness of Tiny Tim. He wakes on Christmas morning a changed man, kind and generous.",
+        "Dickens wrote the novella to make readers care about poverty. When you write about it, link Scrooge's change to this message of social responsibility."
+      ],
+      "check": {
+        "question": "Who is Scrooge's dead business partner?",
+        "options": ["Bob Cratchit", "Jacob Marley", "Fred"],
+        "answer": 1,
+        "explanation": "Jacob Marley's ghost warns Scrooge to change before the 3 spirits visit."
+      }
+    },
+    {
+      "id": "year-10-quadratics-by-factorising",
+      "subject": "Maths",
+      "title": "Solving quadratics by factorising",
+      "summary": "Solve quadratic equations by writing them as 2 brackets.",
+      "curriculum": "GCSE maths: solve quadratic equations algebraically by factorising",
+      "pages": [
+        "A quadratic equation has an x² term, like x² + 5x + 6 = 0.",
+        "To factorise x² + 5x + 6, find 2 numbers that multiply to make 6 and add to make 5. These are 2 and 3.",
+        "So x² + 5x + 6 = (x + 2)(x + 3). If 2 things multiply to make 0, one of them must be 0.",
+        "So x + 2 = 0 or x + 3 = 0, which gives x = −2 or x = −3."
+      ],
+      "check": {
+        "question": "Solve x² − 7x + 12 = 0.",
+        "options": ["x = 3 or x = 4", "x = −3 or x = −4", "x = 2 or x = 6"],
+        "answer": 0,
+        "explanation": "x² − 7x + 12 = (x − 3)(x − 4), so x = 3 or x = 4."
+      }
+    },
+    {
+      "id": "year-10-photosynthesis",
+      "subject": "Biology",
+      "title": "Photosynthesis",
+      "summary": "Find out how plants use light to make glucose.",
+      "curriculum": "GCSE combined science, biology: photosynthesis as an endothermic reaction, its word equation and its limiting factors",
+      "pages": [
+        "Plants make their own food by photosynthesis. It happens in chloroplasts, which contain a green substance called chlorophyll.",
+        "The word equation is: carbon dioxide + water → glucose + oxygen. Light provides the energy, so photosynthesis is endothermic.",
+        "Plants use the glucose for respiration, and to make substances such as starch, cellulose and proteins.",
+        "Light intensity, carbon dioxide concentration and temperature can all limit the rate of photosynthesis."
+      ],
+      "check": {
+        "question": "What are the products of photosynthesis?",
+        "options": ["Glucose and oxygen", "Carbon dioxide and water", "Starch and nitrogen"],
+        "answer": 0,
+        "explanation": "Photosynthesis turns carbon dioxide and water into glucose and oxygen."
+      }
+    },
+    {
+      "id": "year-10-plate-tectonics",
+      "subject": "Geography",
+      "title": "Plate tectonics",
+      "summary": "Learn how moving plates cause earthquakes and volcanoes.",
+      "curriculum": "GCSE geography: the causes of tectonic hazards, including plate boundaries",
+      "pages": [
+        "The Earth's crust is broken into large pieces called tectonic plates. Heat from inside the Earth makes them move slowly.",
+        "At constructive plate boundaries, plates move apart. Magma rises to form new crust, as in Iceland.",
+        "At destructive plate boundaries, one plate sinks under another. This can cause strong earthquakes and explosive volcanoes, as in Japan.",
+        "At conservative plate boundaries, plates slide past each other. Pressure builds up and is released as earthquakes, as on the San Andreas Fault in California."
+      ],
+      "check": {
+        "question": "What happens at a constructive plate boundary?",
+        "options": ["Plates move apart", "One plate sinks under another", "Plates slide past each other"],
+        "answer": 0,
+        "explanation": "At constructive boundaries, plates move apart and new crust forms."
+      }
+    }
+  ]
+}

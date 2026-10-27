@@ -56,6 +56,7 @@ Every kind of content is placed the same way. Each section below adds what's spe
 | [Web experiences](#12-web-experiences-threejs-pages) | A three.js page: `.html`, a folder with `index.html`, or a URL | One self-contained file, or a folder | Its 3D scene in the room, its own controls on a panel |
 | [4D meshes](#13-4d-meshes-sp4m) | A `.sp4m` container, with its soundtrack | A folder | Standing, animated, narrated: captions and cards that point at its parts |
 | [Bare metal content](#14-bare-metal-content-your-own-app) | Your own app: Unity code on a **Bare Metal Content** object | A scene from **New Bare Metal Scene** | However the app decides: ImmersiveX only hosts it |
+| [Content apps](#15-content-apps-an-app-in-the-content-menu) | Unity code: a `ContentApp` component (LearnX is one) | An object in the scene's content | Its own pages in the content menu, and its own content in the room |
 
 Every Immersive Media gets the same acrylic controls (play/pause, seek, time, Replay, speaker, volume) and handles around it (a move bar, turn bars and a turn ring, a resize corner). Each stays where you put it, held by a spatial anchor. Web experiences are the exception for controls: they bring their own player (section 12).
 
@@ -383,6 +384,16 @@ An app that owns everything, with ImmersiveX only as its host: its own menus, wh
 - **Placing it:** the app places everything itself. `ImmersiveHost.UserPose` and `FloorHeight` say where the user is, and `ImmersiveHost.KeepInPlace` keeps an object where it's put, held by a spatial anchor.
 - **Test it** in the Meta XR Simulator as usual. The automation's `host` commands drive it (`host status`, `host capture`, `host raycast`, `host press <button>` …). **Host Check** (`Assets/Demos/BareMetal`) is a small example app.
 
+## 15. Content apps (an app in the content menu)
+An app that lives inside ImmersiveX as one piece of its content. It's listed in the content menu like any other content, and picking it turns the menu to the app's own pages. Unlike bare metal content, it keeps everything ImmersiveX gives other content.
+- **Bring** a component that derives from `ContentApp`, on an object in the scene. Its **Title** and **Kind** are its row in the menu.
+  - `OnPageOpened(ContentAppPage page)` runs the first time the menu turns to the app. Draw a view with `page.NewView(title, eyebrow, back, onBack)`: it has the menu's header (the eyebrow, the title and **×**) and footer (a back button, **Quest menu** and **Close app**). The app draws between `ContentAppPage.BodyTop` and `BodyBottom`, in millimetres from the panel's middle, and draws again whenever its view changes.
+  - The back button is the app's own (**All lessons**, say), or **Content**, back to the menu's list, when it gives none.
+- **In the room:** the app puts ordinary ImmersiveX content (Immersive Media, Immersive Content) under its own object. That content is the app's: it isn't listed in the menu on its own, and it hides (media pauses) with the app when the menu shows something else. It's placed in front of the user, anchored, kept in the mapped room and given its controls (with **Replay**) as any other content is, in MR and VR.
+- **The menu:** `page.Close()` puts the menu away (while the app's media plays, say) and `page.Open()` brings it back on the app's page. While the app is showing, the opening swipe opens its page, and the app is remembered like other content.
+- **LearnX** (`Assets/Content/LearnX`) is a content app: lessons for Nursery to Year 12 in GOV.UK's style. Its lesson **Counting to 10** is a 4D mesh, so put `Assets/StreamingAssets/ImmersiveXContent/Counting_to_10/` (`counting_to_10.sp4m` and `soundtrack.m4a`) in place before you build; its tests name the file if it's missing. **ImmersiveX ▸ Content ▸ Add LearnX** puts it at the top of the open scene's content.
+- **Test it** in the Meta XR Simulator: `contentmenu select <n>` picks the app's row, `host press <button>` presses its page's buttons, `contentmenu back` goes back to the list, and LearnX's `learnx …` commands drive its lessons (`learnx status`, `learnx class Nursery`, `learnx lesson 1`, `learnx media end`, `learnx tour`).
+
 ---
 
 ## Checklist before you add content
@@ -396,6 +407,7 @@ An app that owns everything, with ImmersiveX only as its host: its own menus, wh
 - [ ] Web pages: made with three.js, and either one self-contained `.html` or a folder with `index.html` whose files are linked by relative paths.
 - [ ] 4D meshes: a folder with the `.sp4m` container (not named `.gz`) and its soundtrack.
 - [ ] Bare metal apps: a scene from **New Bare Metal Scene**, an `IBareMetalApp` on the app object, and **Passthrough Camera** on if the app reads the cameras.
+- [ ] Content apps: a `ContentApp` component with its **Title** and **Kind**, and what it puts in the room under its own object.
 - [ ] The size is reasonable for the app, and you're allowed to ship it.
 - [ ] Placed as you want: its order in the scene, and its **Placement**, **Height** and **Up** (section [Placing content in the app](#placing-content-in-the-app)).
 - [ ] Web experiences: added and tested by a coding agent in the Meta XR Simulator (section 12).

@@ -1,0 +1,81 @@
+{
+  "id": "year-1",
+  "order": 1,
+  "name": "Year 1",
+  "stage": "Key stage 1",
+  "ages": "5 to 6",
+  "lessons": [
+    {
+      "id": "year-1-phonics-digraphs",
+      "subject": "English",
+      "title": "Phonics: sh, ch and th",
+      "summary": "Read 3 sounds that are each made by 2 letters.",
+      "curriculum": "Year 1 English, reading: the right sound for each grapheme, including digraphs such as sh, ch and th",
+      "pages": [
+        "Sometimes 2 letters make one sound. We call this a digraph.",
+        "The letters s and h make ‘sh’, as in ship. The letters c and h make ‘ch’, as in chip.",
+        "The letters t and h make ‘th’, as in thin. Say each word slowly: sh-i-p, ch-i-p, th-i-n."
+      ],
+      "check": {
+        "question": "Which word starts with the ‘sh’ sound?",
+        "options": ["chip", "ship", "thin"],
+        "answer": 1,
+        "explanation": "Ship starts with s and h, which make the ‘sh’ sound."
+      }
+    },
+    {
+      "id": "year-1-number-bonds-to-10",
+      "subject": "Maths",
+      "title": "Number bonds to 10",
+      "summary": "Find pairs of numbers that add up to 10.",
+      "curriculum": "Year 1 maths: represent and use number bonds and related subtraction facts within 20",
+      "pages": [
+        "A number bond is a pair of numbers that add up to a total.",
+        "These pairs add up to 10. 1 and 9. 2 and 8. 3 and 7. 4 and 6. 5 and 5.",
+        "If you know 3 + 7 = 10, you also know 10 − 3 = 7."
+      ],
+      "check": {
+        "question": "What goes with 6 to make 10?",
+        "options": ["3", "4", "5"],
+        "answer": 1,
+        "explanation": "6 + 4 = 10, so 4 goes with 6."
+      }
+    },
+    {
+      "id": "year-1-animal-groups",
+      "subject": "Science",
+      "title": "Animal groups",
+      "summary": "Sort animals into 5 groups by what they are like.",
+      "curriculum": "Year 1 science: identify and name common fish, amphibians, reptiles, birds and mammals",
+      "pages": [
+        "Scientists sort animals into groups. Here are 5 groups: fish, amphibians, reptiles, birds and mammals.",
+        "Fish live in water and breathe with gills. Frogs are amphibians. They live in water and on land.",
+        "Reptiles, like snakes, have dry, scaly skin. Birds have feathers. Mammals have hair or fur and feed their babies milk."
+      ],
+      "check": {
+        "question": "A robin has feathers and lays eggs. Which group is it in?",
+        "options": ["Mammals", "Birds", "Reptiles"],
+        "answer": 1,
+        "explanation": "Animals with feathers are birds."
+      }
+    },
+    {
+      "id": "year-1-uk-countries-and-capitals",
+      "subject": "Geography",
+      "title": "Countries and capitals of the UK",
+      "summary": "Name the 4 countries of the UK and their capital cities.",
+      "curriculum": "Key stage 1 geography: name, locate and identify characteristics of the 4 countries and capital cities of the UK",
+      "pages": [
+        "The UK is made up of 4 countries: England, Scotland, Wales and Northern Ireland.",
+        "Each country has a capital city. London is the capital of England, and of the whole UK.",
+        "Edinburgh is the capital of Scotland. Cardiff is the capital of Wales. Belfast is the capital of Northern Ireland."
+      ],
+      "check": {
+        "question": "What is the capital city of Wales?",
+        "options": ["Cardiff", "Belfast", "Edinburgh"],
+        "answer": 0,
+        "explanation": "Cardiff is the capital city of Wales."
+      }
+    }
+  ]
+}

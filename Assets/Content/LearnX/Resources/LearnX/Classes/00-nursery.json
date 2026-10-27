@@ -1,0 +1,32 @@
+{
+  "id": "nursery",
+  "order": 0,
+  "name": "Nursery",
+  "stage": "Early years",
+  "ages": "3 to 4",
+  "lessons": [
+    {
+      "id": "nursery-counting-to-10",
+      "subject": "Mathematics",
+      "title": "Counting to 10",
+      "summary": "Count from 1 to 10 with the numbers in the garden.",
+      "curriculum": "EYFS mathematics: recite numbers past 5, and say one number for each item in order (Development Matters, 3 and 4 year olds)",
+      "pages": [],
+      "media": {
+        "file": "ImmersiveXContent/Counting_to_10/counting_to_10.sp4m",
+        "height": 1.8,
+        "text": "Watch the numbers in the room. Say each number with them."
+      },
+      "check": {
+        "question": "How many stars did the number 3 have?",
+        "options": [
+          "2",
+          "3",
+          "4"
+        ],
+        "answer": 1,
+        "explanation": "The number 3 had 3 stars."
+      }
+    }
+  ]
+}
