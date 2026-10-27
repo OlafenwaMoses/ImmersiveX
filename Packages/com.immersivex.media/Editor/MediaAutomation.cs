@@ -11,7 +11,7 @@ namespace ImmersiveX.Media.Editor
     /// <summary>
     /// Automation commands for ImmersiveX Media (see <see cref="EditorAutomation"/>):
     /// <list type="bullet">
-    /// <item>In Play mode: <c>media status|play|pause|toggle|seek &lt;s&gt;|mute|unmute|speaker|volume &lt;0-1&gt;|turn &lt;deg&gt;|move &lt;x&gt; &lt;z&gt;|height &lt;m&gt;|open &lt;source&gt; [format]</c>
+    /// <item>In Play mode: <c>media status|play|pause|toggle|replay [on|off]|seek &lt;s&gt;|mute|unmute|speaker|volume &lt;0-1&gt;|turn &lt;deg&gt;|move &lt;x&gt; &lt;z&gt;|height &lt;m&gt;|open &lt;source&gt; [format]</c>
     /// (<c>hologram</c> is the same command). Web pages: <c>media inspect</c> (the mirrored scene), <c>media node &lt;name&gt;</c> (where its
     /// objects with that name are), <c>media click &lt;x&gt; &lt;y&gt;</c> (press on the page's panel, in page pixels) and <c>media js &lt;code&gt;</c>
     /// (run JavaScript in the page; what it returns is logged).</item>
@@ -200,6 +200,18 @@ namespace ImmersiveX.Media.Editor
                     else
                         media.SetMuted(!media.Muted);
                     break;
+                case "replay": // the Replay switch: "media replay" flips it, "media replay on|off" sets it
+                    var on = parts.Length > 1 ? parts[1].ToLowerInvariant() switch
+                    {
+                        "on" => true,
+                        "off" => false,
+                        _ => throw new ArgumentException("Usage: media replay [on|off]"),
+                    } : !media.Replay;
+                    if (controls != null && on != media.Replay)
+                        controls.ToggleReplay();
+                    else
+                        media.SetReplay(on);
+                    break;
                 case "seek": media.Seek(Number(1)); break;
                 case "mute": media.SetMuted(true); break;
                 case "unmute": media.SetMuted(false); break;
@@ -255,7 +267,7 @@ namespace ImmersiveX.Media.Editor
             }
 
             var panel = controls != null
-                ? $" · controls at {controls.Panel.position:F2} ('{controls.Title}') showing {(controls.ShowsPause ? "pause" : "play")} and {(controls.ShowsMuted ? "muted" : "speaker")}" +
+                ? $" · controls at {controls.Panel.position:F2} ('{controls.Title}') showing {(controls.ShowsPause ? "pause" : "play")}, {(controls.ShowsMuted ? "muted" : "speaker")} and replay {(controls.ShowsReplay ? "on" : "off")}" +
                   (controls.Caption != null ? $" · caption at {controls.CaptionPosition:F2}" : string.Empty)
                 : string.Empty;
             EditorAutomation.Report(command, "ok", media.DescribeStatus() + panel);

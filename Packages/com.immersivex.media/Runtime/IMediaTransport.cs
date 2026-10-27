@@ -34,9 +34,13 @@ namespace ImmersiveX.Media
         /// <summary>False when there's no sound to mute or turn up.</summary>
         bool HasAudio { get; }
 
+        /// <summary>Starts again from the beginning each time it reaches the end (the controls' Replay switch).</summary>
+        bool Replay { get; }
+
         void TogglePlay();
         void Seek(double seconds);
         void SetVolume(float volume);
         void SetMuted(bool muted);
+        void SetReplay(bool replay);
     }
 }

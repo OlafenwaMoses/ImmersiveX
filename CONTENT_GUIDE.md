@@ -57,7 +57,7 @@ Every kind of content is placed the same way. Each section below adds what's spe
 | [4D meshes](#13-4d-meshes-sp4m) | A `.sp4m` container, with its soundtrack | A folder | Standing, animated, narrated: captions and cards that point at its parts |
 | [Bare metal content](#14-bare-metal-content-your-own-app) | Your own app: Unity code on a **Bare Metal Content** object | A scene from **New Bare Metal Scene** | However the app decides: ImmersiveX only hosts it |
 
-Every Immersive Media gets the same acrylic controls (play/pause, seek, time, speaker, volume) and handles around it (a move bar, turn bars and a turn ring, a resize corner). Each stays where you put it, held by a spatial anchor. Web experiences are the exception for controls: they bring their own player (section 12).
+Every Immersive Media gets the same acrylic controls (play/pause, seek, time, Replay, speaker, volume) and handles around it (a move bar, turn bars and a turn ring, a resize corner). Each stays where you put it, held by a spatial anchor. Web experiences are the exception for controls: they bring their own player (section 12).
 
 ## Using content in the headset
 
@@ -364,7 +364,7 @@ MyScene/
 - **The name ends in `.sp4m`, not `.gz`.** Android's APK packer unzips `.gz` files and drops the extension, so the app couldn't find them. Add Media renames `name.sp4m.gz` to `name.sp4m` when it copies the folder (the player reads gzip either way), and the build check refuses a `.gz` name.
 - **How it shows:**
   - Standing in the room: the scene's ground on the floor, its stage as tall as **Height**, facing you.
-  - It plays on its soundtrack's clock with Immersive Media's controls (play/pause, seek, time, speaker). Captions show in front of the content, and cards point at the parts when the content says.
+  - It plays on its soundtrack's clock with Immersive Media's controls (play/pause, seek, time, Replay, speaker). Captions show in front of the content, and cards point at the parts when the content says.
   - Its parts are selectable: a ray click selects one, a hand picks it up, and it keeps moving with the scene.
   - The colours are baked, so nothing is relit and it looks the same in every room. Soft effects (steam, smoke, fire) are baked Gaussians, drawn like a hologram.
   - **When its subject drives or flies away, the stage follows it:** the subject (a rocket climbing, cars driving off) stays at the content's place at the same size, and what it leaves behind slides away and dissolves at the edge of the room, or sinks below the floor.

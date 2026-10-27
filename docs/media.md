@@ -88,7 +88,7 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
 
 ## What the user can do
 - **Controls** (an acrylic-glass panel, 36 cm wide, that stays with the user, `WithinReach`):
-  - Play/Pause (the icon shows what it will do), seek bar (seeks on release), time, speaker (mute) and volume, with the media's name on a tab above.
+  - Play/Pause (the icon shows what it will do), seek bar (seeks on release), time, a **Replay** switch, speaker (mute) and volume, with the media's name on a tab above.
   - For stills (splats, meshes, photos, unanimated models), Play and the seek bar are greyed out and the panel shows what the file is.
   - Whatever the media (standing, a screen, 360°/180°), the panel sits **low on the user's right at elbow level**: 0.55 m below the eyes (about 1 m above the floor standing, lower sitting), 0.24 m to the right and 0.38 m in front, tilted to face the eyes.
   - It keeps still while the user looks around, looks down at it or leans in to press it, and while its sliders or the move bar are dragged. When they walk more than 0.35 m, sit down or stand up, or turn more than 40° while not looking at it, it glides after them (about 0.3 s) and settles at their side again.
@@ -104,7 +104,7 @@ Plain `http://` URLs get a warning, because Android blocks them by default. **Im
 - **Content menu:** lists every piece of content in the scene and shows one at a time (the choice is remembered), with **Quest menu** and **Close app**. It opens in front of the user when the app starts; after that a quick sideways swipe of either hand opens it: towards the middle of the body (right hand right to left, left hand left to right); the reverse closes it. With more than six pieces, up and down buttons on the right of the list scroll it a row a click. **Space** (in its footer, a green dot when the room is saved) shows what's saved about the room, with **Re-create space** to map it again (Space Setup on Quest) or **Back** to the menu. See the [README](../README.md#in-the-headset) for the picture. Turn it off in Settings ▸ Content Menu.
 - **MR and VR** (the content menu's header, MR at every start): **MR** shows the real room with content standing in it. **VR** hides the real room and puts the user in a quiet, low-lit virtual world (a night sky with faint stars over a dark floor at the real floor's height) where any content stands out. Content keeps its place in the real room either way, the Quest's boundary comes back in VR, and the real walls and furniture show as a soft grid when the user comes within about a metre of them.
 
-It waits, paused, for Play unless **Play On Start** is set. With **Loop** off, it stops at the end and Play starts it again.
+It waits, paused, for Play unless **Play On Start** is set. With **Loop** off, it stops at the end and Play starts it again. The controls' **Replay** switch starts as **Loop** is set and can be changed while it plays: on, the media starts again each time it ends; off, it stops at the end (media loaded with **Loop** stops when it comes round to the start).
 
 ## Sequences
 **A folder of numbered frames** is the simplest sequence:
@@ -189,7 +189,7 @@ With the editor open (see [CONTRIBUTING](../CONTRIBUTING.md#driving-the-open-edi
 
 ```
 media list                                   # every Immersive Media in the scene, numbered (Play mode)
-media [@<n>|@<name>] status|play|pause|toggle|seek <s>|mute|unmute|speaker|volume <0-1>|turn <deg>|move <x> <z>|height <m>
+media [@<n>|@<name>] status|play|pause|toggle|replay [on|off]|seek <s>|mute|unmute|speaker|volume <0-1>|turn <deg>|move <x> <z>|height <m>
 media [@<n>|@<name>] open <source> [format]  # switch what it plays (format: Auto, GaussianSplats, Video360, …)
 media add [fps] <file, folder or URL>        # Add Media, then save the scene (Edit mode)
 media pack [fps] [title=Name] <folder>       # pack splat frames into StreamingAssets, scene untouched (Edit mode)

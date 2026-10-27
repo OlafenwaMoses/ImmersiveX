@@ -8,8 +8,8 @@ namespace ImmersiveX.Media
 {
     /// <summary>
     /// Media controls on an acrylic-glass panel: play/pause (one button whose icon shows what it will do), a seek bar
-    /// you can drag to any point, the time, a speaker button that mutes, and a volume slider. The panel is mostly
-    /// transparent; only the controls are solid. A tab above it names the media.
+    /// you can drag to any point, the time, a Replay switch (on: it starts again at the end), a speaker button that mutes,
+    /// and a volume slider. The panel is mostly transparent; only the controls are solid. A tab above it names the media.
     /// <para>The panel stays within reach of the user, low on their right at elbow level, and glides after them when they
     /// walk or turn (see <see cref="WithinReach"/>). Narrated media's caption stays with the media instead, where the user
     /// is looking (<see cref="PlaceCaption"/>).</para>
@@ -29,6 +29,7 @@ namespace ImmersiveX.Media
         static readonly Color Solid = Color.white;
         static readonly Color Ink = new Color(0.07f, 0.09f, 0.13f);
         static readonly Color Track = new Color(1f, 1f, 1f, 0.28f);
+        const float SwitchTravel = 12f; // the switch's knob, either side of the middle of its track
 
         IMediaTransport _media;
         WithinReach _panel;
@@ -42,6 +43,9 @@ namespace ImmersiveX.Media
         Image _speakerIcon;
         Button _playButton;
         Button _speakerButton;
+        Button _replayButton;
+        Image _replayTrack;
+        RectTransform _replayKnob;
         Slider _seek;
         Slider _volume;
         Text _time;
@@ -181,6 +185,12 @@ namespace ImmersiveX.Media
             Refresh();
         }
 
+        public void ToggleReplay()
+        {
+            _media?.SetReplay(!_media.Replay);
+            Refresh();
+        }
+
         void OnVolumeChanged(float value)
         {
             if (_media == null)
@@ -213,6 +223,9 @@ namespace ImmersiveX.Media
             SetInteractable(_seek, null, _media.HasTimeline);
             SetInteractable(_speakerButton, _speakerIcon, _media.HasAudio);
             SetInteractable(_volume, null, _media.HasAudio);
+            SetInteractable(_replayButton, null, _media.HasTimeline);
+            _replayTrack.color = _media.Replay ? WorldUi.OnColor : Track;
+            _replayKnob.anchoredPosition = new Vector2(_media.Replay ? SwitchTravel : -SwitchTravel, 0f);
 
             var duration = _media.Duration;
             var position = _seeking ? _seek.value * duration : _media.Position;
@@ -242,6 +255,9 @@ namespace ImmersiveX.Media
 
         /// <summary>True when the speaker button shows the muted icon.</summary>
         public bool ShowsMuted => _speakerIcon != null && _speakerIcon.sprite == UiSprites.Muted;
+
+        /// <summary>True when the Replay switch shows on (its knob at the right).</summary>
+        public bool ShowsReplay => _replayKnob != null && _replayKnob.anchoredPosition.x > 0f;
 
         /// <summary>Seconds as m:ss.</summary>
         public static string FormatTime(double seconds)
@@ -282,6 +298,8 @@ namespace ImmersiveX.Media
                 FontStyle.Normal, TextAnchor.MiddleLeft);
             _time.horizontalOverflow = HorizontalWrapMode.Overflow;
 
+            _replayButton = Switch(root, "Replay", new Vector2(40f, -30f), out _replayTrack, out _replayKnob, ToggleReplay);
+
             _speakerIcon = IconButton(root, "Speaker", new Vector2(146f, -30f), 50f, UiSprites.Speaker, 0.66f, ToggleMute);
             _speakerButton = _speakerIcon.GetComponentInParent<Button>();
             _volume = CreateSlider(root, "Volume", new Vector2(229f, -30f), new Vector2(104f, 30f), 22f);
@@ -320,6 +338,38 @@ namespace ImmersiveX.Media
             var image = WorldUi.Rect(circle.transform, "Icon", Vector2.zero, Vector2.one * diameter * iconScale, Ink);
             image.sprite = icon;
             return image;
+        }
+
+        /// <summary>
+        /// A switch: its name, then a rounded track with a solid round knob, pressed as one button (the word too).
+        /// <see cref="Refresh"/> slides the knob and colours the track to show whether it's on.
+        /// </summary>
+        static Button Switch(Transform parent, string label, Vector2 position, out Image track, out RectTransform knob, UnityAction onClick)
+        {
+            var area = WorldUi.Rect(parent, label, position, new Vector2(138f, 44f), Color.clear);
+            area.raycastTarget = true;
+            WorldUi.Label(area.transform, "Label", label, 22, new Vector2(-33f, 0f), new Vector2(72f, 34f),
+                FontStyle.Normal, TextAnchor.MiddleRight).horizontalOverflow = HorizontalWrapMode.Overflow;
+
+            track = WorldUi.Rect(area.transform, "Track", new Vector2(41f, 0f), new Vector2(54f, 30f), Track);
+            track.sprite = UiSprites.Panel;
+            track.type = Image.Type.Sliced;
+            track.pixelsPerUnitMultiplier = 40f / 15f; // the panel's 40 px corners at half its height: round ends, as the seek bar has
+            var dot = WorldUi.Rect(track.transform, "Knob", new Vector2(-SwitchTravel, 0f), new Vector2(24f, 24f), Solid);
+            dot.sprite = UiSprites.Circle;
+            knob = dot.rectTransform;
+
+            var button = area.gameObject.AddComponent<Button>();
+            button.targetGraphic = dot;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            var colors = button.colors;
+            colors.normalColor = Solid;
+            colors.selectedColor = Solid;
+            colors.highlightedColor = new Color(0.82f, 0.9f, 1f);
+            colors.pressedColor = new Color(0.62f, 0.74f, 0.9f);
+            button.colors = colors;
+            button.onClick.AddListener(onClick);
+            return button;
         }
 
         /// <summary>A thin rounded track, a solid fill and a solid round handle.</summary>
