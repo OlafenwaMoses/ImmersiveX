@@ -158,6 +158,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Automation: `media scene|remove|first`, `media … parts|inspect|node|click|js`, `contentmenu status|open|close|select|move|swipe`, `parts …`, `invoke pointers|reach|uirays`.
 
 ### Fixed
+- 4D mesh parts followed object 0 when they had no hull (`List.Find` returns 0 when nothing matches), and a recorded scale read as the user moving a part. Together they drew a whole 4D scene bigger round its first object once that shrank, throwing other objects towards the user. Each part now follows its own object, and its transform has no scale.
 - Soundtracks bundled in the APK were silent on Quest: MediaPlayer can't open `jar:` URLs, so they now open through `AssetManager.openFd`.
 - Play buttons on Quest ignored fingers and pinches when a long grab box or the move bar was right under the panel; panel glass also blocked rays.
 - Web pages re-measured while racing through their load and froze on the first press; they're now placed once, after loading. A page's huge ground no longer gets a collider that picked up the whole base.
