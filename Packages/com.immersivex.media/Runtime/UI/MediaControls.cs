@@ -10,7 +10,7 @@ namespace ImmersiveX.Media
     /// Media controls on an acrylic-glass panel: play/pause (one button whose icon shows what it will do), a seek bar
     /// you can drag to any point, the time, a Replay switch (on: it starts again at the end), a speaker button that mutes,
     /// and a volume slider. The panel is mostly transparent; only the controls are solid. A tab above it names the media.
-    /// <para>The panel stays within reach of the user, low on their right at elbow level, and glides after them when they
+    /// <para>The panel stays within reach of the user, low on their right halfway up the arm, and glides after them when they
     /// walk or turn (see <see cref="WithinReach"/>). Narrated media's caption stays with the media instead, where the user
     /// is looking (<see cref="PlaceCaption"/>).</para>
     /// </summary>

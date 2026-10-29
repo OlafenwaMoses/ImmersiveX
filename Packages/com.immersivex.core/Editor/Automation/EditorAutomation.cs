@@ -430,7 +430,7 @@ namespace ImmersiveX.Editor
         /// <summary>
         /// The content menu: <c>contentmenu status|open|close|toggle|select &lt;n&gt;|scroll up|down [rows]|device</c> (or <c>cm …</c>), and
         /// <c>contentmenu swipe right|left|both</c>, which plays a real swipe's path through the hand-swipe detector (both = a
-        /// clap, which must not count).
+        /// clap, which must not count), and <c>contentmenu button [ray|click]</c>, the menu button at the user's stomach.
         /// </summary>
         /// <summary>
         /// "parts [list|select &lt;n|title&gt;|move &lt;dx&gt; &lt;dy&gt; &lt;dz&gt;|press &lt;button&gt;|ray &lt;button&gt;|click &lt;button&gt;]": the selectable parts of the
@@ -549,6 +549,13 @@ namespace ImmersiveX.Editor
                 case "close": menu.Close(); break;
                 case "toggle": menu.Toggle(); break;
                 case "device": menu.OpenDeviceMenu(); break;
+                case "button": // "contentmenu button [ray|click]": press the menu button, or cast the right hand's ray at it (and click)
+                    var how = parts.Length > 1 ? parts[1].ToLowerInvariant() : "press";
+                    if (how == "press")
+                        menu.Button.Button.onClick.Invoke();
+                    else
+                        note = RayAt(menu.Button.transform, how == "click") + "\n";
+                    break;
                 case "move": // "contentmenu move x y z": put the open menu somewhere else (as if the user moved it there)
                     if (!menu.IsOpen || parts.Length < 4)
                         throw new ArgumentException("Usage: contentmenu move <x> <y> <z> (with the menu open)");

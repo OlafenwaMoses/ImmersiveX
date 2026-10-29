@@ -11,6 +11,7 @@ namespace ImmersiveX
     /// The content menu: a panel listing the scene's content (see <see cref="IContentItem"/>), with Quest menu and Close app
     /// buttons. A fast sideways swipe opens it: the right hand from right to left, or the left hand from left to right. The
     /// reverse swipe closes it: the right hand from left to right, or the left hand from right to left (<see cref="HandSwipes"/>).
+    /// The menu button, a grid of white squares at the user's stomach, opens it too (<see cref="MenuButton"/>).
     /// <list type="bullet">
     /// <item>One piece of content shows at a time: the one picked in the list, which is highlighted. Picking another one shows
     /// that one instead. The app remembers which one was showing.</item>
@@ -89,6 +90,7 @@ namespace ImmersiveX
         bool _awaitingScan;
         XROrigin _origin;
         HandSwipes _swipes;
+        MenuButton _button;
         GameObject _panel;
         Scroller _scroller;
         int _first; // the item in the top row
@@ -107,6 +109,7 @@ namespace ImmersiveX
         public IReadOnlyList<IContentItem> Items => _items;
         public IContentItem Shown { get; private set; }
         public HandSwipes Swipes => _swipes;
+        public MenuButton Button => _button;
 
         /// <summary>True when there's more content than rows, so the list scrolls.</summary>
         public bool Scrolls => _items.Count > RowsPerPage;
@@ -117,7 +120,7 @@ namespace ImmersiveX
         /// <summary>The items in the rows, top to bottom.</summary>
         public IEnumerable<IContentItem> VisibleItems => _items.Skip(_first).Take(RowsPerPage);
 
-        /// <summary>Add the menu (and its swipe watcher) for <paramref name="origin"/>'s user, and show one piece of content.</summary>
+        /// <summary>Add the menu (and its swipe watcher and menu button) for <paramref name="origin"/>'s user, and show one piece of content.</summary>
         public static ContentMenu Create(XROrigin origin)
         {
             var menu = new GameObject("Content Menu").AddComponent<ContentMenu>();
@@ -132,6 +135,8 @@ namespace ImmersiveX
                 ImmersiveXLog.Info($"Content menu: {(hand == InteractorHandedness.Right ? "right" : "left")} hand swiped {(direction == SwipeDirection.Outward ? "back" : "across")}; {action}.");
                 menu.Swipe(direction);
             };
+            menu._button = MenuButton.Create(menu.Viewer, menu.PressButton);
+            menu._button.transform.root.SetParent(menu.transform, false);
             menu.FindItems();
             menu.ShowOnly(menu.Remembered() ?? menu._items.FirstOrDefault());
             menu._inApp = menu.Shown is ContentApp; // an app that was showing opens on its page
@@ -163,6 +168,13 @@ namespace ImmersiveX
                 Close();
             else if (direction == SwipeDirection.Inward)
                 Open();
+        }
+
+        /// <summary>What the menu button does: what the opening swipe does.</summary>
+        public void PressButton()
+        {
+            ImmersiveXLog.Info($"Content menu: menu button pressed; {(!IsOpen ? "opening the menu in front of the user" : IsInFront() ? "keeping the menu in front of the user" : "bringing the menu in front of the user")}.");
+            Swipe(SwipeDirection.Inward);
         }
 
         /// <summary>Close the menu when it's open in front of the user; otherwise open it there (automation).</summary>
@@ -684,7 +696,8 @@ namespace ImmersiveX
             (_modes != null ? $"view {(_modes.Mode == ViewMode.Virtual ? "VR" : "MR")} · " : string.Empty) +
             $"space {(ImmersiveXSession.Instance != null && ImmersiveXSession.Instance.CurrentSpace != null ? "saved" : "not saved")}{(_space != null && _space.IsShowing ? " (Space panel open)" : string.Empty)} · " +
             (AppPage != null ? $"on {AppPage.App.Title}'s page{(AppPage.Title != null ? $" ('{AppPage.Title}', back: {AppPage.Back})" : string.Empty)} · " : string.Empty) +
-            $"swipes recognised: {(_swipes != null ? _swipes.Count : 0)}";
+            $"swipes recognised: {(_swipes != null ? _swipes.Count : 0)}" +
+            (_button != null ? $" · menu button at {_button.transform.position:F2}" : string.Empty);
 
         Transform Viewer() =>
             _origin != null && _origin.Camera != null ? _origin.Camera.transform : Camera.main != null ? Camera.main.transform : null;

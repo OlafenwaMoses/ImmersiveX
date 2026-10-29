@@ -5,18 +5,18 @@ using UnityEngine;
 namespace ImmersiveX
 {
     /// <summary>
-    /// Keeps a panel within reach of the user: low on their right at elbow level (about 1 m above the floor standing, lower
-    /// sitting) and a forearm's length in front, tilted to face their eyes. It keeps still while they look around, look down at it or lean
+    /// Keeps a panel within reach of the user: low on their right, halfway up the arm between elbow and shoulder (about
+    /// 1.2 m above the floor standing, lower sitting) and a forearm's length in front, tilted to face their eyes. It keeps still while they look around, look down at it or lean
     /// in to press it, and glides after them when they walk away, sit down or stand up, or turn to face somewhere else (see
     /// <see cref="Follower"/>). It also keeps still while <see cref="Hold"/> says so (a slider or handle in use). Several
-    /// at once stack upwards in the order they appeared.
+    /// at once stack upwards in the order they appeared, unless one doesn't <see cref="Stacks"/>.
     /// </summary>
     [AddComponentMenu("")]
     [DefaultExecutionOrder(-50)] // before anything placed relative to the panel (the move bar under it)
     public sealed class WithinReach : MonoBehaviour
     {
         /// <summary>Where the panel sits from the user's eyes, in metres: X to their right, Y up (below the eyes is negative), Z forward.</summary>
-        public static readonly Vector3 DefaultOffset = new Vector3(0.24f, -0.55f, 0.38f);
+        public static readonly Vector3 DefaultOffset = new Vector3(0.24f, -0.4f, 0.38f);
 
         /// <summary>How far apart stacked panels are, in metres.</summary>
         public const float StackSpacing = 0.15f;
@@ -30,6 +30,9 @@ namespace ImmersiveX
 
         /// <summary>Where the panel sits from the user's eyes (see <see cref="DefaultOffset"/>).</summary>
         public Vector3 Offset = DefaultOffset;
+
+        /// <summary>False for a panel with a place of its own (<see cref="MenuButton"/>): it doesn't stack, and the others stack as if it weren't there.</summary>
+        public bool Stacks = true;
 
         /// <summary>While this returns true the panel keeps still.</summary>
         public Func<bool> Hold;
@@ -58,8 +61,25 @@ namespace ImmersiveX
             var toPanel = transform.position - head.position;
             var lookedAt = _follower.IsPlaced && toPanel.sqrMagnitude > 1e-4f && Vector3.Angle(head.forward, toPanel) < LookAngle;
             _follower.Step(head.position, head.forward, lookedAt, Hold != null && Hold(), Time.unscaledDeltaTime);
-            var pose = _follower.Place(Offset + Vector3.up * (Active.IndexOf(this) * StackSpacing));
+            var pose = _follower.Place(Offset + Vector3.up * (StackIndex() * StackSpacing));
             transform.SetPositionAndRotation(pose.position, pose.rotation);
+        }
+
+        /// <summary>How many stacking panels appeared before this one (0 when it doesn't stack).</summary>
+        int StackIndex()
+        {
+            if (!Stacks)
+                return 0;
+            var index = 0;
+            foreach (var other in Active)
+            {
+                if (other == this)
+                    break;
+                if (other.Stacks)
+                    index++;
+            }
+
+            return index;
         }
 
         static Transform DefaultViewer()
