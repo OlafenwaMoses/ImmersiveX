@@ -24,6 +24,7 @@ namespace ImmersiveX.Tests
             Assert.AreEqual(MenuButton.Grid * MenuButton.Grid, _button.Squares.Count);
             Assert.IsTrue(_button.Squares.All(s => s.color == new Color(1f, 1f, 1f, 0.5f)), "white at 50 %");
             Assert.IsTrue(_button.Squares.All(s => !s.raycastTarget), "the whole tile takes the click, not each square");
+            Assert.AreEqual(47f, ((RectTransform)_button.transform).sizeDelta.x, 0.01f, "4.7 cm across");
         }
 
         [Test]
@@ -36,13 +37,13 @@ namespace ImmersiveX.Tests
         }
 
         [Test]
-        public void ItSitsInTheMiddleAtStomachLevel_BelowThePlayer_AndDoesntStack()
+        public void ItSitsAFootToTheLeftAtStomachLevel_BelowThePlayer_AndDoesntStack()
         {
             var follower = new WithinReach.Follower();
             follower.Step(Eyes, Vector3.forward, false, false, 0.016f);
             var button = follower.Place(MenuButton.Offset).position;
             var player = follower.Place(WithinReach.DefaultOffset).position;
-            Assert.AreEqual(0f, button.x, 1e-4f, "in the middle");
+            Assert.AreEqual(-0.3f, button.x, 1e-4f, "a foot to the left");
             Assert.Greater(button.z, 0.25f, "in front");
             Assert.AreEqual(1.08f, button.y, 0.03f, "stomach level for 1.6 m eyes");
             Assert.Less(button.y, player.y - 0.1f, "below the player");

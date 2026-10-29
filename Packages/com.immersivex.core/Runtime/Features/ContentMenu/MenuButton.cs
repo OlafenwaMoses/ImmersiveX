@@ -8,23 +8,23 @@ using UnityEngine.UI;
 namespace ImmersiveX
 {
     /// <summary>
-    /// The menu button: a grid of white squares, half transparent, in front of the user at stomach level. The ray clicks it
-    /// and a finger presses it; either opens the content menu in front of the user, as the opening swipe does
-    /// (<see cref="HandSwipes"/>). It stays with the user as the media controls do (<see cref="WithinReach"/>), but in the
-    /// middle, below them, and never stacks with them. Under the ray or a finger its squares brighten.
+    /// The menu button: a small grid of white squares, half transparent, at the user's stomach level and a foot to their
+    /// left. The ray clicks it and a finger presses it; either opens the content menu in front of the user, as the opening
+    /// swipe does (<see cref="HandSwipes"/>). It stays with the user as the media controls do (<see cref="WithinReach"/>),
+    /// but on the other side, below them, and never stacks with them. Under the ray or a finger its squares brighten.
     /// </summary>
     [AddComponentMenu("")]
     public sealed class MenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
-        /// <summary>Where it sits from the user's eyes, in metres: in the middle, at stomach level, close in front.</summary>
-        public static readonly Vector3 Offset = new Vector3(0f, -0.52f, 0.34f);
+        /// <summary>Where it sits from the user's eyes, in metres: a foot to their left, at stomach level, close in front.</summary>
+        public static readonly Vector3 Offset = new Vector3(-0.3f, -0.52f, 0.34f);
 
         /// <summary>The squares across and down.</summary>
         public const int Grid = 3;
 
-        const float Square = 22f;
-        const float Gap = 8f;
-        const float Margin = 6f;
+        const float Square = 11f;
+        const float Gap = 4f;
+        const float Margin = 3f;
 
         /// <summary>The squares at rest: white, half transparent.</summary>
         public static readonly Color Idle = new Color(1f, 1f, 1f, 0.5f);
@@ -68,7 +68,7 @@ namespace ImmersiveX
                     new Vector2(first + column * (Square + Gap), -first - row * (Square + Gap)), new Vector2(Square, Square), Idle);
                 square.sprite = UiSprites.Panel;
                 square.type = Image.Type.Sliced;
-                square.pixelsPerUnitMultiplier = 40f / 4f; // the panel's 40 px corners at 4 mm: squares with softened corners
+                square.pixelsPerUnitMultiplier = 40f / 2f; // the panel's 40 px corners at 2 mm: squares with softened corners
                 button._squares.Add(square);
             }
 
