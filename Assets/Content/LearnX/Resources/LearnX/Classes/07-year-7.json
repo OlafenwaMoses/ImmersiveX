@@ -1,0 +1,84 @@
+{
+  "id": "year-7",
+  "order": 7,
+  "name": "Year 7",
+  "stage": "Key stage 3",
+  "ages": "11 to 12",
+  "lessons": [
+    {
+      "id": "year-7-similes-and-metaphors",
+      "subject": "English",
+      "title": "Similes and metaphors",
+      "summary": "Compare things to help a reader picture them.",
+      "curriculum": "Key stage 3 English: how figurative language, such as similes and metaphors, presents meaning",
+      "pages": [
+        "Writers compare things to help readers picture them. Similes and metaphors are 2 common ways to do this.",
+        "A simile compares 2 things using ‘like’ or ‘as’. For example: ‘Her smile was as bright as the sun.’",
+        "A metaphor says one thing is another. For example: ‘The classroom was a zoo.’ The writer means it was noisy and wild, not full of animals."
+      ],
+      "check": {
+        "question": "Which of these is a metaphor?",
+        "options": ["He ran like the wind.", "Time is a thief.", "She was as quiet as a mouse."],
+        "answer": 1,
+        "explanation": "‘Time is a thief’ says time is something else, without ‘like’ or ‘as’."
+      }
+    },
+    {
+      "id": "year-7-negative-numbers",
+      "subject": "Maths",
+      "title": "Negative numbers",
+      "summary": "Order, add and subtract numbers below 0.",
+      "curriculum": "Key stage 3 maths: order positive and negative integers, and use the 4 operations with them",
+      "pages": [
+        "Negative numbers are less than 0. You see them on thermometers when it is very cold, such as −5°C.",
+        "On a number line, numbers get smaller as you move left. So −8 is smaller than −3.",
+        "Adding a positive number moves you right: −3 + 5 = 2. Subtracting a positive number moves you left: 2 − 6 = −4.",
+        "Subtracting a negative number is the same as adding: 4 − (−2) = 6."
+      ],
+      "check": {
+        "question": "What is −4 + 7?",
+        "options": ["−11", "3", "11"],
+        "answer": 1,
+        "explanation": "Start at −4 and move 7 to the right. You end at 3."
+      }
+    },
+    {
+      "id": "year-7-plant-and-animal-cells",
+      "subject": "Science (biology)",
+      "title": "Plant and animal cells",
+      "summary": "Learn the main parts of plant and animal cells and what they do.",
+      "curriculum": "Key stage 3 biology: cell structure, including the cell wall, cell membrane, cytoplasm, nucleus, vacuole, mitochondria and chloroplasts",
+      "pages": [
+        "All living things are made of cells. Most cells are too small to see without a microscope.",
+        "Animal and plant cells both have a nucleus, cytoplasm, a cell membrane and mitochondria.",
+        "The nucleus controls the cell. The cell membrane controls what goes in and out. Respiration happens in the mitochondria and releases energy.",
+        "Plant cells also have a cell wall, a vacuole and chloroplasts. Chloroplasts absorb light for photosynthesis."
+      ],
+      "check": {
+        "question": "Which part do plant cells have but animal cells do not?",
+        "options": ["Nucleus", "Chloroplasts", "Cell membrane"],
+        "answer": 1,
+        "explanation": "Plant cells have chloroplasts for photosynthesis. Animal cells do not."
+      }
+    },
+    {
+      "id": "year-7-norman-conquest",
+      "subject": "History",
+      "title": "The Norman Conquest",
+      "summary": "Find out how William of Normandy became king of England in 1066.",
+      "curriculum": "Key stage 3 history: the development of Church, state and society in Medieval Britain, 1066 to 1509",
+      "pages": [
+        "King Edward the Confessor died in January 1066 without a child to take the throne. Several men claimed the crown.",
+        "Harold Godwinson became king. On 14 October 1066, William, Duke of Normandy, defeated and killed him at the Battle of Hastings.",
+        "William became king on Christmas Day 1066. The Normans built castles across England to control the land and its people.",
+        "In 1086, William's officials completed the Domesday Book, a record of who owned land and property in England."
+      ],
+      "check": {
+        "question": "Who won the Battle of Hastings?",
+        "options": ["Harold Godwinson", "William, Duke of Normandy", "Edward the Confessor"],
+        "answer": 1,
+        "explanation": "William, Duke of Normandy, won the battle and became King William I."
+      }
+    }
+  ]
+}

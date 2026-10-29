@@ -78,12 +78,7 @@ namespace ImmersiveX.Media
                 }
 
                 node.Transform.SetParent(node.Parent != null ? node.Parent.Transform : _holder, false);
-                // the part's frame: a hull of the part if it has one (it doesn't swivel), else its first object
-                node.Frame = objects.Find(o => _c.Objects[o].Kind == "hull");
-                if (node.Frame < 0)
-                    node.Frame = objects.Find(o => _c.Objects[o].Kind != "bell" && _c.Objects[o].Kind != "engine" && _c.Objects[o].Kind != "liquid");
-                if (node.Frame < 0)
-                    node.Frame = objects[0];
+                node.Frame = FrameOf(objects, o => _c.Objects[o].Kind);
                 byName[p.Name] = node;
                 _nodes.Add(node);
                 node.PartName = p.Name;
@@ -119,6 +114,19 @@ namespace ImmersiveX.Media
 
             Parts.RefreshGrab();
             Pose();
+        }
+
+        /// <summary>
+        /// The object a part follows: a hull of the part if it has one (it doesn't swivel), else its first object that isn't
+        /// a bell, an engine or a liquid, else its first object. FindIndex, as Find returns 0 when nothing matches: object 0,
+        /// which made every part follow that one object.
+        /// </summary>
+        internal static int FrameOf(List<int> objects, Func<int, string> kindOf)
+        {
+            var frame = objects.FindIndex(o => kindOf(o) == "hull");
+            if (frame < 0)
+                frame = objects.FindIndex(o => kindOf(o) != "bell" && kindOf(o) != "engine" && kindOf(o) != "liquid");
+            return objects[Mathf.Max(0, frame)];
         }
 
         static int Depth(string name) => name.Split('.').Length;
@@ -190,8 +198,10 @@ namespace ImmersiveX.Media
         {
             foreach (var node in _nodes)
             {
-                var frame = _renderer.ObjectMatrix(node.Frame);
-                var parentFrame = node.Parent != null ? _renderer.ObjectMatrix(node.Parent.Frame) : Matrix4x4.identity;
+                // a part's transform has no scale, so it follows its frame's place and turn; the frame's scale stays with
+                // the objects in it
+                var frame = Rigid(_renderer.ObjectMatrix(node.Frame));
+                var parentFrame = node.Parent != null ? Rigid(_renderer.ObjectMatrix(node.Parent.Frame)) : Matrix4x4.identity;
                 var local = parentFrame.inverse * frame;
                 node.Transform.SetLocalPositionAndRotation(local.GetColumn(3), local.rotation);
                 var visible = false;
@@ -199,6 +209,8 @@ namespace ImmersiveX.Media
                 {
                     var objectInPart = frame.inverse * _renderer.ObjectMatrix(o);
                     box.transform.SetLocalPositionAndRotation(objectInPart.MultiplyPoint3x4(centre), objectInPart.rotation);
+                    var scale = objectInPart.lossyScale;
+                    box.size = Vector3.Max(Vector3.Scale(size, new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z))), Vector3.one * 0.2f);
                     box.enabled = _renderer.Visible[o];
                     visible |= _renderer.Visible[o];
                 }
@@ -221,13 +233,16 @@ namespace ImmersiveX.Media
             foreach (var node in _nodes)
             {
                 var placed = toContent * node.Transform.localToWorldMatrix; // where the user has it
-                var home = _renderer.ObjectMatrix(node.Frame); // where the recording has it
+                var home = Rigid(_renderer.ObjectMatrix(node.Frame)); // where the recording has it (without its scale, as placed)
                 node.Delta = placed * home.inverse;
                 node.Moved = !IsIdentity(node.Delta);
             }
         }
 
-        static bool IsIdentity(Matrix4x4 m)
+        /// <summary><paramref name="m"/>'s place and turn, without its scale.</summary>
+        internal static Matrix4x4 Rigid(Matrix4x4 m) => Matrix4x4.TRS(m.GetColumn(3), m.rotation, Vector3.one);
+
+        internal static bool IsIdentity(Matrix4x4 m)
         {
             for (var i = 0; i < 16; i++)
                 if (Mathf.Abs(m[i] - (i % 5 == 0 ? 1f : 0f)) > 1e-4f)

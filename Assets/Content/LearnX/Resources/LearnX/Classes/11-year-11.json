@@ -1,0 +1,85 @@
+{
+  "id": "year-11",
+  "order": 11,
+  "name": "Year 11",
+  "stage": "Key stage 4",
+  "ages": "15 to 16",
+  "note": "Most GCSE exams are at the end of Year 11.",
+  "lessons": [
+    {
+      "id": "year-11-an-inspector-calls",
+      "subject": "English literature",
+      "title": "An Inspector Calls",
+      "summary": "Explore how Priestley uses the Birling family to argue for social responsibility.",
+      "curriculum": "GCSE English literature: British fiction or drama from 1914 onwards",
+      "pages": [
+        "JB Priestley wrote ‘An Inspector Calls’ in 1945, but set it in 1912. The audience knows about the world wars that the characters cannot foresee.",
+        "Inspector Goole questions the wealthy Birling family about the death of a young woman, Eva Smith. Each of them played a part in her death.",
+        "Mr Birling believes “a man has to mind his own business and look after himself”. The Inspector argues the opposite: “We are members of one body. We are responsible for each other.”",
+        "The younger characters, Sheila and Eric, accept their guilt and change. Their parents mostly do not, which shows Priestley's hope for the young."
+      ],
+      "check": {
+        "question": "When is ‘An Inspector Calls’ set?",
+        "options": ["1912", "1945", "1918"],
+        "answer": 0,
+        "explanation": "Priestley set the play in 1912, before the First World War."
+      }
+    },
+    {
+      "id": "year-11-trigonometry",
+      "subject": "Maths",
+      "title": "Trigonometry in right-angled triangles",
+      "summary": "Use sine, cosine and tangent to find sides and angles.",
+      "curriculum": "GCSE maths: the trigonometric ratios sin θ, cos θ and tan θ, and using them to find angles and lengths in right-angled triangles",
+      "pages": [
+        "In a right-angled triangle, name the sides from the angle θ: the opposite side, the adjacent side and the hypotenuse.",
+        "sin θ = opposite ÷ hypotenuse, cos θ = adjacent ÷ hypotenuse and tan θ = opposite ÷ adjacent. Many people remember this as SOH CAH TOA.",
+        "If the hypotenuse is 10 centimetres (cm) and θ = 30°, the opposite side = 10 × sin 30° = 10 × 0.5 = 5cm."
+      ],
+      "check": {
+        "question": "Which ratio is opposite ÷ adjacent?",
+        "options": ["sin θ", "cos θ", "tan θ"],
+        "answer": 2,
+        "explanation": "tan θ = opposite ÷ adjacent: the TOA in SOH CAH TOA."
+      }
+    },
+    {
+      "id": "year-11-periodic-table",
+      "subject": "Chemistry",
+      "title": "The periodic table",
+      "summary": "Find out how the periodic table groups elements that behave alike.",
+      "curriculum": "GCSE combined science, chemistry: the periodic table, and groups 0, 1 and 7",
+      "pages": [
+        "The periodic table lists the elements in order of atomic number. Columns are called groups, and rows are called periods.",
+        "In 1869, Dmitri Mendeleev left gaps in his table for elements nobody had discovered yet. Later discoveries filled them.",
+        "Elements in the same group have the same number of electrons in their outer shell, so they react in similar ways.",
+        "Group 1, the alkali metals, react with water and get more reactive down the group. Group 0, the noble gases, have full outer shells, so they are very unreactive."
+      ],
+      "check": {
+        "question": "Why are the noble gases so unreactive?",
+        "options": ["They have full outer shells", "They are metals", "They are very heavy"],
+        "answer": 0,
+        "explanation": "With full outer shells, noble gas atoms do not need to gain or lose electrons."
+      }
+    },
+    {
+      "id": "year-11-current-voltage-resistance",
+      "subject": "Physics",
+      "title": "Current, potential difference and resistance",
+      "summary": "Use V = I × R to work out values in a circuit.",
+      "curriculum": "GCSE combined science, physics: potential difference = current × resistance (V = IR)",
+      "pages": [
+        "Current is the flow of electric charge. It is measured in amps (A).",
+        "Potential difference, often called voltage, is measured in volts (V). Resistance makes it harder for current to flow, and is measured in ohms (Ω).",
+        "Potential difference = current × resistance, or V = I × R.",
+        "If I = 2A and R = 6Ω, then V = 2 × 6 = 12V."
+      ],
+      "check": {
+        "question": "A current of 4A flows through a 3Ω resistor. What is the potential difference across it?",
+        "options": ["7V", "12V", "0.75V"],
+        "answer": 1,
+        "explanation": "V = I × R = 4 × 3 = 12V."
+      }
+    }
+  ]
+}

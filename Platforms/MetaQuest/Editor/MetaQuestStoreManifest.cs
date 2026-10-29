@@ -20,6 +20,9 @@ namespace ImmersiveX.Platforms.MetaQuest.Editor
     /// (<c>quest2+</c>, <c>questpro+</c> or <c>quest3+</c>), so an upload doesn't default to the original Quest, and
     /// future devices are included (the LIVE channel needs a forward-compatible build). A value already in the
     /// manifest is kept.</item>
+    /// <item>the app's data isn't backed up (<c>android:allowBackup="false"</c>), which the store's security
+    /// vulnerability review asks for. Nothing ImmersiveX saves is worth restoring elsewhere: placements are held by
+    /// spatial anchors in this headset's room.</item>
     /// </list>
     /// The install location ("auto"), the orientation and the SDK levels are also set in <see cref="MetaQuestBuildConfigurator"/>.
     /// </summary>
@@ -71,6 +74,15 @@ namespace ImmersiveX.Platforms.MetaQuest.Editor
             var ns = new XmlNamespaceManager(xml.NameTable);
             ns.AddNamespace("android", AndroidNs);
             var changes = new List<string>();
+
+            // Every manifest that declares the application says the same, so merging them can't conflict.
+            foreach (XmlElement application in xml.SelectNodes("/manifest/application", ns))
+            {
+                if (application.GetAttribute("allowBackup", AndroidNs) == "false")
+                    continue;
+                application.SetAttribute("allowBackup", AndroidNs, "false");
+                changes.Add("app data not backed up");
+            }
 
             foreach (XmlElement activity in xml.SelectNodes("/manifest/application/activity", ns))
             {

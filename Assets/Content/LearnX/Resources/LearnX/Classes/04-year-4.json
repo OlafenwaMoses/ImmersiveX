@@ -1,0 +1,83 @@
+{
+  "id": "year-4",
+  "order": 4,
+  "name": "Year 4",
+  "stage": "Key stage 2",
+  "ages": "8 to 9",
+  "lessons": [
+    {
+      "id": "year-4-fronted-adverbials",
+      "subject": "English",
+      "title": "Fronted adverbials",
+      "summary": "Start a sentence with words that say when, where or how.",
+      "curriculum": "Year 4 English: use fronted adverbials, with commas after them",
+      "pages": [
+        "An adverbial tells you when, where or how something happens.",
+        "A fronted adverbial comes at the start of a sentence. For example: ‘Later that day, we went to the park.’",
+        "Put a comma after a fronted adverbial. For example: ‘Without a sound, the cat crept past.’"
+      ],
+      "check": {
+        "question": "Which sentence uses a fronted adverbial correctly?",
+        "options": ["Before lunch, we read a story.", "We read a story, before lunch.", "Before lunch we, read a story."],
+        "answer": 0,
+        "explanation": "‘Before lunch’ comes first, with a comma after it."
+      }
+    },
+    {
+      "id": "year-4-times-tables-to-12",
+      "subject": "Maths",
+      "title": "Times tables up to 12 × 12",
+      "summary": "Practise times tables facts up to 12 × 12.",
+      "curriculum": "Year 4 maths: recall multiplication and division facts for multiplication tables up to 12 × 12",
+      "pages": [
+        "By the end of Year 4, you should know all the times tables up to 12 × 12. In Year 4, you take a short online check of them.",
+        "Use facts you know to work out new ones. 6 × 7 is double 3 × 7. 3 × 7 = 21, so 6 × 7 = 42.",
+        "Dividing undoes multiplying. If 8 × 9 = 72, then 72 ÷ 9 = 8."
+      ],
+      "check": {
+        "question": "What is 7 × 8?",
+        "options": ["54", "56", "63"],
+        "answer": 1,
+        "explanation": "7 × 8 = 56. One way to remember it: 5, 6, 7, 8, as in 56 = 7 × 8."
+      }
+    },
+    {
+      "id": "year-4-simple-circuits",
+      "subject": "Science",
+      "title": "Simple circuits",
+      "summary": "Build a circuit and find out which materials let electricity through.",
+      "curriculum": "Year 4 science: construct a simple series circuit, and recognise some common conductors and insulators",
+      "pages": [
+        "A circuit is a path that electricity flows around. A simple circuit has a cell, wires and a bulb.",
+        "The circuit must be a complete loop. If there is a gap, the bulb will not light. A switch opens and closes a gap.",
+        "Conductors let electricity flow through them. Most metals, like copper, are good conductors.",
+        "Insulators, like plastic and rubber, do not let electricity through. Wires are covered in plastic to keep you safe."
+      ],
+      "check": {
+        "question": "Which material is a good conductor?",
+        "options": ["Plastic", "Copper", "Rubber"],
+        "answer": 1,
+        "explanation": "Copper is a metal, and most metals are good conductors."
+      }
+    },
+    {
+      "id": "year-4-romans-in-britain",
+      "subject": "History",
+      "title": "The Romans in Britain",
+      "summary": "Find out how the Roman Empire changed Britain.",
+      "curriculum": "Key stage 2 history: the Roman Empire and its impact on Britain",
+      "pages": [
+        "In AD 43, the Roman army invaded Britain. Britain was part of the Roman Empire for more than 350 years.",
+        "In about AD 60, Boudica, queen of the Iceni tribe, led a revolt against the Romans. The Romans defeated her army.",
+        "The Romans built straight roads, towns and public baths. Many towns began as Roman towns, such as London.",
+        "In AD 122, Emperor Hadrian ordered a long wall across the north of England. You can still see parts of Hadrian's Wall today."
+      ],
+      "check": {
+        "question": "Who led a revolt against the Romans in Britain?",
+        "options": ["Boudica", "Hadrian", "Claudius"],
+        "answer": 0,
+        "explanation": "Boudica, queen of the Iceni, led a revolt in about AD 60."
+      }
+    }
+  ]
+}

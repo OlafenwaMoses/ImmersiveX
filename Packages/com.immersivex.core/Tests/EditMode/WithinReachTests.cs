@@ -21,12 +21,12 @@ namespace ImmersiveX.Tests
         }
 
         [Test]
-        public void Place_IsLowOnTheRightAtElbowLevel_FacingTheEyes()
+        public void Place_IsLowOnTheRightHalfwayUpTheArm_FacingTheEyes()
         {
             var pose = Placed().Place(WithinReach.DefaultOffset);
             Assert.Greater(pose.position.x, 0.15f, "on the right");
             Assert.Greater(pose.position.z, 0.3f, "in front");
-            Assert.AreEqual(1.05f, pose.position.y, 0.02f, "elbow level for 1.6 m eyes: about a metre above the floor");
+            Assert.AreEqual(1.2f, pose.position.y, 0.02f, "halfway up the arm for 1.6 m eyes: between the elbow (about 1.05 m) and the shoulder");
             Assert.Greater(Vector3.Dot(pose.rotation * Vector3.forward, (pose.position - Eyes).normalized), 0.99f, "turned to the eyes");
         }
 
@@ -60,7 +60,7 @@ namespace ImmersiveX.Tests
         {
             var follower = Placed();
             Run(follower, new Vector3(0f, 1.15f, 0f), Vector3.forward, 2f);
-            Assert.AreEqual(0.6f, follower.Place(WithinReach.DefaultOffset).position.y, 0.05f);
+            Assert.AreEqual(0.75f, follower.Place(WithinReach.DefaultOffset).position.y, 0.05f);
         }
 
         [Test]

@@ -1,0 +1,83 @@
+{
+  "id": "year-3",
+  "order": 3,
+  "name": "Year 3",
+  "stage": "Key stage 2",
+  "ages": "7 to 8",
+  "lessons": [
+    {
+      "id": "year-3-prefixes",
+      "subject": "English",
+      "title": "Prefixes",
+      "summary": "Add letters to the start of a word to change what it means.",
+      "curriculum": "Year 3 and 4 English, spelling: prefixes such as un-, dis-, mis- and re-, and how they change meaning",
+      "pages": [
+        "A prefix is a group of letters you add to the start of a word. It changes the word's meaning.",
+        "The prefixes ‘un’ and ‘dis’ often mean ‘not’. Unhappy means not happy. Dislike means not like.",
+        "The prefix ‘re’ means ‘again’, so rebuild means build again. The prefix ‘mis’ means ‘wrongly’, so misspell means spell wrongly."
+      ],
+      "check": {
+        "question": "What does ‘unkind’ mean?",
+        "options": ["Very kind", "Not kind", "Kind again"],
+        "answer": 1,
+        "explanation": "The prefix ‘un’ means ‘not’, so unkind means not kind."
+      }
+    },
+    {
+      "id": "year-3-roman-numerals",
+      "subject": "Maths",
+      "title": "Roman numerals on a clock",
+      "summary": "Read Roman numerals from I to XII, as on some clocks.",
+      "curriculum": "Year 3 maths: tell and write the time from an analogue clock, including using Roman numerals from I to XII",
+      "pages": [
+        "The Romans used letters to write numbers. I means 1, V means 5 and X means 10.",
+        "Put I after a letter to add 1. So VI is 6 and XI is 11.",
+        "Put I before a letter to take away 1. So IV is 4 and IX is 9.",
+        "Some clocks use Roman numerals. XII is at the top, for 12 o'clock."
+      ],
+      "check": {
+        "question": "What number is IX?",
+        "options": ["9", "11", "4"],
+        "answer": 0,
+        "explanation": "I before X means 1 less than 10, so IX is 9."
+      }
+    },
+    {
+      "id": "year-3-magnets",
+      "subject": "Science",
+      "title": "Magnets",
+      "summary": "Find out how magnets attract and repel.",
+      "curriculum": "Year 3 science: describe magnets as having 2 poles, predict whether 2 magnets will attract or repel, and identify some magnetic materials",
+      "pages": [
+        "A magnet pulls some metals towards it. We say the magnet attracts them.",
+        "Iron and steel are magnetic. Some metals, like copper and aluminium, are not. Wood, plastic and paper are not magnetic.",
+        "Every magnet has a north pole and a south pole. Opposite poles attract. The same poles push each other away, or repel."
+      ],
+      "check": {
+        "question": "Which of these will a magnet attract?",
+        "options": ["A plastic spoon", "An iron nail", "A wooden block"],
+        "answer": 1,
+        "explanation": "Iron is magnetic, so a magnet attracts an iron nail."
+      }
+    },
+    {
+      "id": "year-3-stone-age-britain",
+      "subject": "History",
+      "title": "Stone Age Britain",
+      "summary": "Find out how people in Britain lived in the Stone Age.",
+      "curriculum": "Key stage 2 history: changes in Britain from the Stone Age to the Iron Age",
+      "pages": [
+        "The Stone Age is named after the tools people made from stone. They often used a hard stone called flint.",
+        "At first, people hunted animals and gathered plants to eat. They moved from place to place to find food.",
+        "Later, people started to farm. They could stay in one place and build villages.",
+        "You can still visit Skara Brae in Orkney, Scotland. It is a Stone Age village about 5,000 years old."
+      ],
+      "check": {
+        "question": "Why is it called the Stone Age?",
+        "options": ["People made tools from stone", "People lived in stone castles", "The weather was cold"],
+        "answer": 0,
+        "explanation": "People made many of their tools from stone, such as flint."
+      }
+    }
+  ]
+}

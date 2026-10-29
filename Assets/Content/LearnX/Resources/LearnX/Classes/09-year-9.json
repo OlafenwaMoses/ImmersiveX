@@ -1,0 +1,83 @@
+{
+  "id": "year-9",
+  "order": 9,
+  "name": "Year 9",
+  "stage": "Key stage 3",
+  "ages": "13 to 14",
+  "lessons": [
+    {
+      "id": "year-9-romeo-and-juliet-prologue",
+      "subject": "English literature",
+      "title": "Romeo and Juliet: the prologue",
+      "summary": "Find out what the opening of Shakespeare's play tells the audience.",
+      "curriculum": "Key stage 3 English: reading 2 plays by Shakespeare",
+      "pages": [
+        "Romeo and Juliet opens with a prologue, spoken by the Chorus. It is a sonnet: a poem of 14 lines.",
+        "It introduces 2 families in Verona who hate each other: “Two households, both alike in dignity”.",
+        "It calls Romeo and Juliet “a pair of star-cross'd lovers” and tells us they will die.",
+        "The audience knows the ending from the start, but the characters do not. This creates dramatic irony throughout the play."
+      ],
+      "check": {
+        "question": "What kind of poem is the prologue?",
+        "options": ["A haiku", "A sonnet", "A limerick"],
+        "answer": 1,
+        "explanation": "The prologue is a sonnet: 14 lines that rhyme in a set pattern."
+      }
+    },
+    {
+      "id": "year-9-pythagoras",
+      "subject": "Maths",
+      "title": "Pythagoras' theorem",
+      "summary": "Find a missing side of a right-angled triangle.",
+      "curriculum": "Key stage 3 maths: use Pythagoras' theorem to solve problems involving right-angled triangles",
+      "pages": [
+        "Pythagoras' theorem works for right-angled triangles. The longest side, opposite the right angle, is called the hypotenuse.",
+        "If the shorter sides are a and b, and the hypotenuse is c, then a² + b² = c².",
+        "For example, if a = 3 and b = 4, then c² = 9 + 16 = 25. So c = √25 = 5."
+      ],
+      "check": {
+        "question": "A right-angled triangle has shorter sides of 6 centimetres and 8 centimetres. How long is the hypotenuse?",
+        "options": ["10cm", "14cm", "48cm"],
+        "answer": 0,
+        "explanation": "6² + 8² = 36 + 64 = 100, and √100 = 10, so it is 10cm."
+      }
+    },
+    {
+      "id": "year-9-speed",
+      "subject": "Science (physics)",
+      "title": "Speed",
+      "summary": "Work out how fast something moves from distance and time.",
+      "curriculum": "Key stage 3 physics: the relationship between average speed, distance and time (speed = distance ÷ time)",
+      "pages": [
+        "Speed tells you how far something travels in a certain time.",
+        "Speed = distance ÷ time. With distance in metres and time in seconds, speed is in metres per second (m/s).",
+        "A runner covers 100 metres in 20 seconds. Their speed is 100 ÷ 20 = 5m/s."
+      ],
+      "check": {
+        "question": "A cyclist travels 150 metres in 30 seconds. What is their average speed?",
+        "options": ["5m/s", "4,500m/s", "0.2m/s"],
+        "answer": 0,
+        "explanation": "150 ÷ 30 = 5, so their average speed is 5m/s."
+      }
+    },
+    {
+      "id": "year-9-first-world-war",
+      "subject": "History",
+      "title": "The First World War",
+      "summary": "Find out how the war started in 1914 and what fighting was like.",
+      "curriculum": "Key stage 3 history: challenges for Britain, Europe and the wider world from 1901 to the present day, such as the First World War",
+      "pages": [
+        "On 28 June 1914, Gavrilo Princip shot dead Archduke Franz Ferdinand, heir to the throne of Austria-Hungary, in Sarajevo.",
+        "Alliances between countries turned this into a wider war. Britain declared war on Germany on 4 August 1914.",
+        "On the Western Front, soldiers fought from trenches. On the first day of the Battle of the Somme, 1 July 1916, the British Army had about 57,000 casualties.",
+        "Fighting stopped at 11am on 11 November 1918. Every year, people in the UK remember those who died on Armistice Day and Remembrance Sunday."
+      ],
+      "check": {
+        "question": "When did fighting stop in the First World War?",
+        "options": ["11am on 11 November 1918", "28 June 1914", "1 July 1916"],
+        "answer": 0,
+        "explanation": "Fighting stopped with the armistice at 11am on 11 November 1918."
+      }
+    }
+  ]
+}

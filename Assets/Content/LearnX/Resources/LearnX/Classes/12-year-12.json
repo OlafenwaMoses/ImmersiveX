@@ -1,0 +1,85 @@
+{
+  "id": "year-12",
+  "order": 12,
+  "name": "Year 12",
+  "stage": "Sixth form",
+  "ages": "16 to 17",
+  "note": "Year 12 is the first year of most A level courses.",
+  "lessons": [
+    {
+      "id": "year-12-differentiating-powers",
+      "subject": "Maths",
+      "title": "Differentiating powers of x",
+      "summary": "Find the gradient of a curve by differentiating.",
+      "curriculum": "A level mathematics: differentiate x to a power, with constant multiples, sums and differences, and find gradients",
+      "pages": [
+        "Differentiation finds the gradient of a curve at any point. The result is called the derivative, written dy/dx.",
+        "To differentiate x to a power, multiply by the power and then take 1 from the power. So if y = x³, then dy/dx = 3x².",
+        "Differentiate each term on its own. A constant on its own becomes 0. If y = 4x² + 3x + 7, then dy/dx = 8x + 3.",
+        "To find the gradient at a point, put in its x value. At x = 2, the gradient of y = 4x² + 3x + 7 is 8 × 2 + 3 = 19."
+      ],
+      "check": {
+        "question": "What is dy/dx if y = 5x²?",
+        "options": ["10x", "5x", "10x²"],
+        "answer": 0,
+        "explanation": "Multiply by the power, 2, and take 1 from the power: 5 × 2x = 10x."
+      }
+    },
+    {
+      "id": "year-12-structure-of-dna",
+      "subject": "Biology",
+      "title": "The structure of DNA",
+      "summary": "Learn how DNA is built from nucleotides and held together by base pairs.",
+      "curriculum": "A level biology: the structure of DNA, including nucleotides and complementary base pairing",
+      "pages": [
+        "DNA is a polymer made of monomers called nucleotides. Each nucleotide has a phosphate group, a deoxyribose sugar and a nitrogenous base.",
+        "There are 4 bases in DNA: adenine (A), thymine (T), cytosine (C) and guanine (G).",
+        "DNA has 2 strands that twist into a double helix. Hydrogen bonds between complementary bases hold the strands together: A pairs with T, and C pairs with G.",
+        "A and T form 2 hydrogen bonds, and C and G form 3. Base pairing lets DNA copy itself accurately by semi-conservative replication."
+      ],
+      "check": {
+        "question": "Which base pairs with cytosine in DNA?",
+        "options": ["Adenine", "Guanine", "Thymine"],
+        "answer": 1,
+        "explanation": "Cytosine pairs with guanine, joined by 3 hydrogen bonds."
+      }
+    },
+    {
+      "id": "year-12-the-mole",
+      "subject": "Chemistry",
+      "title": "Amount of substance: the mole",
+      "summary": "Use moles to count particles and work out masses.",
+      "curriculum": "A level chemistry: amount of substance, the mole and the Avogadro constant",
+      "pages": [
+        "Chemists count particles in moles. One mole of a substance contains 6.02 × 10²³ particles. This number is the Avogadro constant.",
+        "Relative formula mass (Mr) is the sum of the relative atomic masses in a formula. For water, H2O, Mr = 1 + 1 + 16 = 18.",
+        "Amount in moles = mass ÷ Mr. So 36 grams (g) of water is 36 ÷ 18 = 2 moles."
+      ],
+      "check": {
+        "question": "How many moles are in 88g of carbon dioxide, which has an Mr of 44?",
+        "options": ["2", "44", "0.5"],
+        "answer": 0,
+        "explanation": "Moles = mass ÷ Mr = 88 ÷ 44 = 2."
+      }
+    },
+    {
+      "id": "year-12-supply-and-demand",
+      "subject": "Economics",
+      "title": "Supply and demand",
+      "summary": "See how buyers and sellers set the price in a market.",
+      "curriculum": "A level economics: price determination, and how supply and demand interact in markets",
+      "pages": [
+        "Demand is how much of a good people want to buy at each price. When the price falls, demand usually rises.",
+        "Supply is how much producers want to sell at each price. When the price rises, supply usually rises too.",
+        "The market settles where demand equals supply. This is called the equilibrium price.",
+        "If demand rises and supply stays the same, the equilibrium price rises. This is why tickets for popular concerts can cost a lot."
+      ],
+      "check": {
+        "question": "Demand for a product rises but supply does not change. What happens to the equilibrium price?",
+        "options": ["It rises", "It falls", "It stays the same"],
+        "answer": 0,
+        "explanation": "More buyers compete for the same supply, so the price rises."
+      }
+    }
+  ]
+}

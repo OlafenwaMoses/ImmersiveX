@@ -303,6 +303,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!4 &446878035
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1180830399}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &771007832
 GameObject:
   m_ObjectHideFlags: 0
@@ -334,18 +349,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: ImmersiveX.Media::ImmersiveX.Media.ImmersiveMedia
   _source: https://genxr-streaming-media.sfo3.cdn.digitaloceanspaces.com/demos/3-5d-xperience/stream.json
   _format: 0
+  _stereo: 0
   _title: 3.5D Xperience
   _playOnStart: 0
   _loop: 0
   _volume: 0.8
+  _frameRate: 0
   _height: 1.6
   _screenHeight: 1
-  _placement: 0
   _distanceFromUser: 2
   _spot: -1
   _up: 0
   _showControls: 1
   _showHandles: 1
+  _selectableParts: 1
   _quality: base
   _maxGaussians: 0
   _parallelDownloads: 24
@@ -597,13 +614,111 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1180830399
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 446878035}
+  - component: {fileID: 1462478249}
+  m_Layer: 0
+  m_Name: JWT Guitar Performance
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1462478249
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1180830399}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f71ceff2a1844c39a8dac59bda9beaa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ImmersiveX.Media::ImmersiveX.Media.ImmersiveMedia
+  _source: https://genxr-streaming-media.sfo3.cdn.digitaloceanspaces.com/demos/JWT/stream-v3.json
+  _format: 0
+  _stereo: 0
+  _title: JWT Guitar Performance
+  _playOnStart: 0
+  _loop: 0
+  _volume: 0.8
+  _frameRate: 0
+  _height: 1.3
+  _screenHeight: 1
+  _distanceFromUser: 2
+  _spot: -1
+  _up: 0
+  _showControls: 1
+  _showHandles: 1
+  _selectableParts: 1
+  _quality: base
+  _maxGaussians: 0
+  _parallelDownloads: 24
+  _bufferSeconds: 3
+  _prerollSeconds: 1
+--- !u!1 &1755845312
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1755845314}
+  - component: {fileID: 1755845313}
+  m_Layer: 0
+  m_Name: LearnX
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1755845313
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1755845312}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0490a5d94e0154c6a8fa9c2955fc4d54, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: LearnX::LearnX.LearnXContent
+  _title: LearnX
+  _kind: "Lessons \xB7 Nursery to Year 12"
+--- !u!4 &1755845314
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1755845312}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 1755845314}
   - {fileID: 1071777321}
   - {fileID: 111257564}
   - {fileID: 880203828}
   - {fileID: 1078538679}
   - {fileID: 213178561}
   - {fileID: 771007834}
+  - {fileID: 446878035}

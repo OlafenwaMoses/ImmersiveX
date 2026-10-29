@@ -1,0 +1,81 @@
+{
+  "id": "year-6",
+  "order": 6,
+  "name": "Year 6",
+  "stage": "Key stage 2",
+  "ages": "10 to 11",
+  "lessons": [
+    {
+      "id": "year-6-passive-voice",
+      "subject": "English",
+      "title": "The passive voice",
+      "summary": "Spot the passive voice and know when to use it.",
+      "curriculum": "Year 6 English: use the passive voice to change how information is presented in a sentence",
+      "pages": [
+        "In the active voice, the subject does the action: ‘The dog chased the ball.’",
+        "In the passive voice, the action is done to the subject: ‘The ball was chased by the dog.’",
+        "Use the passive when it does not matter who did the action: ‘The window was broken.’ Most of the time, the active voice is clearer."
+      ],
+      "check": {
+        "question": "Which sentence is in the passive voice?",
+        "options": ["The cat ate the fish.", "The fish was eaten by the cat.", "The cat is hungry."],
+        "answer": 1,
+        "explanation": "The action is done to the fish: it was eaten by the cat."
+      }
+    },
+    {
+      "id": "year-6-ratio",
+      "subject": "Maths",
+      "title": "Ratio",
+      "summary": "Compare 2 amounts using a ratio.",
+      "curriculum": "Year 6 maths: solve problems involving the relative sizes of 2 quantities",
+      "pages": [
+        "A ratio compares 2 amounts. With 2 red beads for every 1 blue bead, the ratio of red to blue is 2:1.",
+        "To make more, multiply both parts by the same number. A ratio of 2:1 is the same as 4:2 or 6:3.",
+        "A recipe uses 3 cups of flour for every 1 cup of sugar. For 9 cups of flour, you need 3 cups of sugar."
+      ],
+      "check": {
+        "question": "A drink uses 1 part juice to 4 parts water. How much water goes with 3 parts juice?",
+        "options": ["7 parts", "12 parts", "4 parts"],
+        "answer": 1,
+        "explanation": "Multiply both parts by 3: 1:4 becomes 3:12."
+      }
+    },
+    {
+      "id": "year-6-heart-and-blood",
+      "subject": "Science",
+      "title": "The heart and blood",
+      "summary": "Find out how your heart moves blood around your body.",
+      "curriculum": "Year 6 science: the main parts of the human circulatory system, and the functions of the heart, blood vessels and blood",
+      "pages": [
+        "Your heart is a muscle. It pumps blood around your body all the time, even when you sleep.",
+        "Blood travels in tubes called blood vessels. Arteries carry blood away from the heart. Veins carry blood back to it.",
+        "Blood carries oxygen and nutrients to every part of your body. It also carries waste, like carbon dioxide, away."
+      ],
+      "check": {
+        "question": "What does the heart do?",
+        "options": ["It digests food", "It pumps blood around the body", "It helps you see"],
+        "answer": 1,
+        "explanation": "The heart is a muscle that pumps blood around the body."
+      }
+    },
+    {
+      "id": "year-6-algorithms-and-loops",
+      "subject": "Computing",
+      "title": "Algorithms and loops",
+      "summary": "Write clear steps for a task, and repeat steps with a loop.",
+      "curriculum": "Key stage 2 computing: design, write and debug programs, using sequence, selection and repetition",
+      "pages": [
+        "An algorithm is a set of steps to do a task. The steps must be in the right order. This is called sequence.",
+        "A loop repeats steps. Instead of writing ‘move forward’ 4 times, you can write ‘repeat 4 times: move forward’.",
+        "Selection lets a program make a choice: ‘if it is raining, take an umbrella’. If a program goes wrong, find and fix the mistake. This is called debugging."
+      ],
+      "check": {
+        "question": "A robot must draw a square. Which instruction uses a loop?",
+        "options": ["Repeat 4 times: move forward, turn right", "Move forward, turn right", "If there is a wall, stop"],
+        "answer": 0,
+        "explanation": "‘Repeat 4 times’ is a loop: it does the same steps 4 times."
+      }
+    }
+  ]
+}

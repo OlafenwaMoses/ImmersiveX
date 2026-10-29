@@ -132,6 +132,9 @@ namespace ImmersiveX.Media
         BoxCollider _collider;
         ContentAnchor _anchoring;
         bool _wantPlaying;
+        bool _replay;
+        bool _seeked;
+        double _lastPosition;
         bool _placed;
         bool _lost;
         bool _resumeAfterPause;
@@ -150,6 +153,13 @@ namespace ImmersiveX.Media
         {
             get => _source;
             set => _source = value;
+        }
+
+        /// <summary>Its name: on the controls' tab, in the content menu and in logs (the file's name when it's empty).</summary>
+        public string Title
+        {
+            get => Name;
+            set => _title = value ?? string.Empty;
         }
 
         public MediaFormat Format
@@ -209,6 +219,12 @@ namespace ImmersiveX.Media
         public float Volume => _volume;
         public bool Muted => _muted;
 
+        /// <summary>
+        /// Start again from the beginning at the end. It starts as <c>Loop</c> is set, and the controls' Replay switch turns
+        /// it on and off while the media plays.
+        /// </summary>
+        public bool Replay => _replay;
+
         public string Status =>
             _status ?? (_playable != null && _playable.IsLoaded && _playable.Duration <= 0d ? _playable.Description : null);
 
@@ -221,8 +237,8 @@ namespace ImmersiveX.Media
             _wantPlaying = true;
             if (_playable == null || !_placed)
                 return; // starts once it's loaded and in the room
-            if (!_loop && _playable.Duration > 0d && _playable.Position >= _playable.Duration - 0.05)
-                _playable.Seek(0d); // at the end: Play starts it again
+            if (_playable.Duration > 0d && _playable.Position >= _playable.Duration - 0.05)
+                Seek(0d); // at the end: Play starts it again
             _playable.Play();
         }
 
@@ -240,7 +256,19 @@ namespace ImmersiveX.Media
                 Play();
         }
 
-        public void Seek(double seconds) => _playable?.Seek(Math.Max(0d, Math.Min(seconds, Math.Max(0d, Duration - 1e-3))));
+        public void Seek(double seconds)
+        {
+            _seeked = true;
+            _playable?.Seek(Math.Max(0d, Math.Min(seconds, Math.Max(0d, Duration - 1e-3))));
+        }
+
+        public void SetReplay(bool replay)
+        {
+            if (_replay == replay)
+                return;
+            _replay = replay;
+            ImmersiveXLog.Info($"Media: {Name} · replay {(replay ? "on" : "off")}.");
+        }
 
         public void SetVolume(float volume)
         {
@@ -296,7 +324,7 @@ namespace ImmersiveX.Media
             if (_playable == null || !_playable.IsLoaded)
                 return $"{Name}: {_status ?? "loading"}";
             var state = !HasTimeline ? "still" : IsBuffering ? "buffering" : _wantPlaying ? "playing" : "paused";
-            var time = HasTimeline ? $" {MediaControls.FormatTime(Position)} / {MediaControls.FormatTime(Duration)}" : string.Empty;
+            var time = HasTimeline ? $" {MediaControls.FormatTime(Position)} / {MediaControls.FormatTime(Duration)}{(_replay ? " · replay" : string.Empty)}" : string.Empty;
             return $"{Name}: {state}{time} · {_playable.Description} · {_playable.Presentation} · {_fps:0} fps · " +
                    $"{transform.position:F2} yaw {transform.eulerAngles.y:0}° · {_anchoring.Status}";
         }
@@ -307,6 +335,7 @@ namespace ImmersiveX.Media
 
         void Awake()
         {
+            _replay = _loop;
             _content = new GameObject("Content").transform;
             _content.SetParent(transform, false);
 
@@ -478,9 +507,27 @@ namespace ImmersiveX.Media
                 return;
 
             _playable.Tick(Time.unscaledDeltaTime);
-            if (_wantPlaying && _playable.Duration > 0d && !_loop && !_playable.IsBuffering &&
-                _playable.Position >= _playable.Duration - 0.05)
-                Pause(); // reached the end: the button shows Play again
+            var position = _playable.Position;
+            if (_wantPlaying && _playable.Duration > 0d && !_playable.IsBuffering)
+            {
+                // At the end, Replay starts it again; without it, it stops there and the button shows Play again. A player
+                // loaded with Loop comes round to the start by itself, so with Replay off it's stopped when it does.
+                var atEnd = position >= _playable.Duration - 0.05;
+                var cameRound = _loop && !_seeked && position < _lastPosition - 0.5 * _playable.Duration;
+                if (!_replay && (atEnd || cameRound))
+                {
+                    Pause();
+                    if (cameRound)
+                        Seek(_playable.Duration);
+                }
+                else if (_replay && atEnd && !_loop)
+                {
+                    Play();
+                }
+            }
+
+            _lastPosition = position;
+            _seeked = false;
 
             if (_placed && Time.unscaledTime >= _nextStatusLog)
             {

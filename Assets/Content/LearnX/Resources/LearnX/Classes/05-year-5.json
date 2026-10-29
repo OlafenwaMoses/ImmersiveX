@@ -1,0 +1,81 @@
+{
+  "id": "year-5",
+  "order": 5,
+  "name": "Year 5",
+  "stage": "Key stage 2",
+  "ages": "9 to 10",
+  "lessons": [
+    {
+      "id": "year-5-relative-clauses",
+      "subject": "English",
+      "title": "Relative clauses",
+      "summary": "Add information to a sentence with who, which, where, when, whose or that.",
+      "curriculum": "Year 5 English: relative clauses beginning with who, which, where, when, whose or that",
+      "pages": [
+        "A relative clause adds information about a noun. It often starts with who, which, where, when, whose or that.",
+        "For example: ‘My aunt, who lives in Leeds, is a nurse.’ The relative clause tells you more about my aunt.",
+        "Use ‘who’ for people and ‘which’ for things. For example: ‘The bike, which was red, had a flat tyre.’"
+      ],
+      "check": {
+        "question": "Which word fits the gap in ‘The boy ___ won the race was tired’?",
+        "options": ["which", "who", "where"],
+        "answer": 1,
+        "explanation": "Use ‘who’ for people: the boy who won the race."
+      }
+    },
+    {
+      "id": "year-5-percentages",
+      "subject": "Maths",
+      "title": "Percentages",
+      "summary": "Understand percentages as parts of 100.",
+      "curriculum": "Year 5 maths: recognise the per cent symbol (%), understand per cent as parts per hundred, and write percentages as fractions and decimals",
+      "pages": [
+        "Per cent means ‘out of 100’. The symbol for per cent is %.",
+        "50% means 50 out of 100. That is the same as one half.",
+        "You can write a percentage as a fraction or a decimal. 25% is 25 out of 100, which is 0.25."
+      ],
+      "check": {
+        "question": "What is 75% as a decimal?",
+        "options": ["7.5", "0.75", "0.075"],
+        "answer": 1,
+        "explanation": "75% means 75 out of 100, which is 0.75."
+      }
+    },
+    {
+      "id": "year-5-earth-sun-and-moon",
+      "subject": "Science",
+      "title": "Earth, Sun and Moon",
+      "summary": "Find out how the Earth and Moon move, and why we have day and night.",
+      "curriculum": "Year 5 science: describe the movement of the Earth and Moon, and use the Earth's rotation to explain day and night",
+      "pages": [
+        "The Earth travels around the Sun. One trip around the Sun takes about 365 days, which is one year.",
+        "The Moon travels around the Earth. One trip takes about 4 weeks.",
+        "The Earth spins on its axis once a day. When your side of the Earth faces the Sun, it is day. When it faces away, it is night."
+      ],
+      "check": {
+        "question": "Why do we have day and night?",
+        "options": ["The Sun travels around the Earth", "The Earth spins on its axis", "The Moon blocks the Sun"],
+        "answer": 1,
+        "explanation": "The Earth spins once a day, so each place faces the Sun and then faces away."
+      }
+    },
+    {
+      "id": "year-5-latitude-and-longitude",
+      "subject": "Geography",
+      "title": "Latitude and longitude",
+      "summary": "Use imaginary lines on maps and globes to find places.",
+      "curriculum": "Key stage 2 geography: latitude, longitude, the Equator, the hemispheres and the Prime (or Greenwich) Meridian",
+      "pages": [
+        "Maps and globes have imaginary lines to help us find places. Lines of latitude run east to west. Lines of longitude run north to south.",
+        "The Equator is the line of latitude around the middle of the Earth. It splits the Earth into the Northern and Southern Hemispheres.",
+        "The Prime Meridian is the line of longitude at 0 degrees. It runs through Greenwich in London."
+      ],
+      "check": {
+        "question": "What is the line of latitude around the middle of the Earth called?",
+        "options": ["The Prime Meridian", "The Equator", "The Arctic Circle"],
+        "answer": 1,
+        "explanation": "The Equator runs around the middle of the Earth."
+      }
+    }
+  ]
+}

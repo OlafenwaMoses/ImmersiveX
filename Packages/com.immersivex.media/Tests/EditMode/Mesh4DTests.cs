@@ -221,6 +221,28 @@ namespace ImmersiveX.Media.Tests
         }
 
         [Test]
+        public void Parts_EachPartFollowsItsOwnObject()
+        {
+            var kinds = new Dictionary<int, string> { [3] = "numeral", [4] = "face", [5] = "hull", [7] = "bell", [8] = "numeral" };
+
+            Assert.AreEqual(3, Mesh4DParts.FrameOf(new List<int> { 3, 4 }, o => kinds[o]), "no hull: its first object, not object 0");
+            Assert.AreEqual(5, Mesh4DParts.FrameOf(new List<int> { 3, 4, 5 }, o => kinds[o]), "its hull");
+            Assert.AreEqual(8, Mesh4DParts.FrameOf(new List<int> { 7, 8 }, o => kinds[o]), "not a bell");
+            Assert.AreEqual(7, Mesh4DParts.FrameOf(new List<int> { 7 }, o => kinds[o]), "only a bell: that");
+        }
+
+        [Test]
+        public void Parts_ARecordedScaleIsNotAMove()
+        {
+            // a number shrunk into its row: the part's transform (no scale) is where the recording has it, so nothing moved
+            var home = Matrix4x4.TRS(new Vector3(-2.45f, 0.06f, -0.45f), Quaternion.Euler(0f, 30f, 4f), new Vector3(0.55f, 0.57f, 0.55f));
+            var placed = Matrix4x4.TRS(home.GetColumn(3), home.rotation, Vector3.one);
+
+            Assert.IsTrue(Mesh4DParts.IsIdentity(placed * Mesh4DParts.Rigid(home).inverse));
+            Assert.IsFalse(Mesh4DParts.IsIdentity(placed * home.inverse), "against the scaled pose it would read as a move");
+        }
+
+        [Test]
         public void Container_ReadsGzippedBytes()
         {
             var c = Mesh4DContainer.Read(Gzip(SmallContainer()));

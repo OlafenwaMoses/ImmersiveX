@@ -1,0 +1,83 @@
+{
+  "id": "year-8",
+  "order": 8,
+  "name": "Year 8",
+  "stage": "Key stage 3",
+  "ages": "12 to 13",
+  "lessons": [
+    {
+      "id": "year-8-persuasive-writing",
+      "subject": "English",
+      "title": "Persuasive writing",
+      "summary": "Use techniques that help you persuade a reader.",
+      "curriculum": "Key stage 3 English, writing: write for a range of purposes and audiences, supporting ideas and arguments with evidence",
+      "pages": [
+        "Persuasive writing tries to make the reader agree with you or do something. Adverts, speeches and letters often persuade.",
+        "Useful techniques include facts and statistics, rhetorical questions and repetition. A rhetorical question does not need an answer: ‘Who wants dirty beaches?’",
+        "Back up each point with evidence, then explain why it matters. End with a clear call to action, such as ‘Join the beach clean on Saturday.’"
+      ],
+      "check": {
+        "question": "Which of these is a rhetorical question?",
+        "options": ["What time is it?", "Do we really want our parks full of litter?", "Where is the library?"],
+        "answer": 1,
+        "explanation": "It makes a point, and the writer does not expect an answer."
+      }
+    },
+    {
+      "id": "year-8-linear-equations",
+      "subject": "Maths",
+      "title": "Solving linear equations",
+      "summary": "Find an unknown number by doing the same to both sides of an equation.",
+      "curriculum": "Key stage 3 maths: solve linear equations in one unknown algebraically",
+      "pages": [
+        "An equation has an equals sign, and both sides have the same value. A letter, like x, stands for an unknown number.",
+        "To solve an equation, do the same thing to both sides until x is on its own.",
+        "Solve 3x + 4 = 19. Take 4 from both sides: 3x = 15. Divide both sides by 3: x = 5.",
+        "Check your answer by putting it back in: 3 × 5 + 4 = 19."
+      ],
+      "check": {
+        "question": "Solve 2x − 3 = 11.",
+        "options": ["x = 4", "x = 7", "x = 14"],
+        "answer": 1,
+        "explanation": "Add 3 to both sides: 2x = 14. Divide both sides by 2: x = 7."
+      }
+    },
+    {
+      "id": "year-8-atoms-elements-compounds",
+      "subject": "Science (chemistry)",
+      "title": "Atoms, elements and compounds",
+      "summary": "Learn what all substances are made of.",
+      "curriculum": "Key stage 3 chemistry: atoms, elements and compounds, and chemical symbols and formulae",
+      "pages": [
+        "Everything is made of tiny particles called atoms. An element contains only one type of atom, like oxygen or iron.",
+        "Each element has a symbol. O is oxygen, H is hydrogen, Fe is iron and Na is sodium.",
+        "A compound forms when atoms of different elements join together chemically. Water is a compound.",
+        "Its formula, H2O, means 2 hydrogen atoms joined to one oxygen atom. Carbon dioxide, CO2, is another compound."
+      ],
+      "check": {
+        "question": "Which of these is a compound?",
+        "options": ["Oxygen", "Iron", "Carbon dioxide"],
+        "answer": 2,
+        "explanation": "Carbon dioxide is carbon and oxygen atoms joined together."
+      }
+    },
+    {
+      "id": "year-8-binary-numbers",
+      "subject": "Computing",
+      "title": "Binary numbers",
+      "summary": "Count using only 0 and 1, as computers do.",
+      "curriculum": "Key stage 3 computing: how numbers are represented in binary, and simple operations on binary numbers",
+      "pages": [
+        "Computers store all data as binary: only 0s and 1s. Each 0 or 1 is called a bit.",
+        "In binary, each place is worth double the place to its right. With 4 bits, the places are worth 8, 4, 2 and 1.",
+        "To read 1011, add the places that have a 1: 8 + 2 + 1 = 11. So 1011 in binary is 11 in denary, the numbers we usually use."
+      ],
+      "check": {
+        "question": "What is the binary number 0110 in denary?",
+        "options": ["6", "110", "3"],
+        "answer": 0,
+        "explanation": "The 4 and the 2 places have a 1: 4 + 2 = 6."
+      }
+    }
+  ]
+}

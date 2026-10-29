@@ -1,0 +1,83 @@
+{
+  "id": "year-2",
+  "order": 2,
+  "name": "Year 2",
+  "stage": "Key stage 1",
+  "ages": "6 to 7",
+  "lessons": [
+    {
+      "id": "year-2-apostrophes-for-missing-letters",
+      "subject": "English",
+      "title": "Apostrophes for missing letters",
+      "summary": "Use an apostrophe to show where letters have been left out.",
+      "curriculum": "Year 2 English: apostrophes to mark where letters are missing in spelling",
+      "pages": [
+        "Sometimes we join 2 words and leave out some letters. An apostrophe shows where the letters were.",
+        "‘I am’ becomes ‘I'm’. ‘It is’ becomes ‘it's’. ‘You will’ becomes ‘you'll’.",
+        "‘Do not’ becomes ‘don't’. The apostrophe goes where the letter o was."
+      ],
+      "check": {
+        "question": "What is the short way to write ‘we are’?",
+        "options": ["we're", "were", "wer'e"],
+        "answer": 0,
+        "explanation": "The apostrophe goes where the letter a was: we're."
+      }
+    },
+    {
+      "id": "year-2-times-tables-2-5-10",
+      "subject": "Maths",
+      "title": "The 2, 5 and 10 times tables",
+      "summary": "Learn facts from the 2, 5 and 10 times tables.",
+      "curriculum": "Year 2 maths: recall and use multiplication and division facts for the 2, 5 and 10 multiplication tables",
+      "pages": [
+        "Multiplying means adding equal groups. 3 groups of 2 is 2 + 2 + 2, which makes 6. We write 3 × 2 = 6.",
+        "The 2 times table goes 2, 4, 6, 8, 10. Every answer is an even number.",
+        "The 5 times table goes 5, 10, 15, 20, 25. Every answer ends in 5 or 0.",
+        "The 10 times table goes 10, 20, 30, 40, 50. Every answer ends in 0."
+      ],
+      "check": {
+        "question": "What is 5 × 4?",
+        "options": ["9", "20", "25"],
+        "answer": 1,
+        "explanation": "Count in 5s: 5, 10, 15, 20. So 5 × 4 = 20."
+      }
+    },
+    {
+      "id": "year-2-what-animals-need",
+      "subject": "Science",
+      "title": "What animals need to survive",
+      "summary": "Find out what animals, including humans, need to stay alive and healthy.",
+      "curriculum": "Year 2 science: the basic needs of animals, including humans (water, food and air), and the importance of exercise, diet and hygiene",
+      "pages": [
+        "All animals, including humans, need water, food and air to stay alive.",
+        "Humans need to eat the right amounts of different types of food.",
+        "Exercise keeps your body strong. Washing your hands stops germs from spreading."
+      ],
+      "check": {
+        "question": "Which 3 things do all animals need to stay alive?",
+        "options": ["Water, food and air", "Toys, food and air", "Water, sweets and sunshine"],
+        "answer": 0,
+        "explanation": "All animals need water, food and air."
+      }
+    },
+    {
+      "id": "year-2-great-fire-of-london",
+      "subject": "History",
+      "title": "The Great Fire of London",
+      "summary": "Find out how a fire in 1666 changed London.",
+      "curriculum": "Key stage 1 history: events beyond living memory that are significant nationally, such as the Great Fire of London",
+      "pages": [
+        "In 1666, a fire started in a bakery on Pudding Lane in London.",
+        "People built houses from wood, close together. A strong wind spread the fire fast.",
+        "The fire burned for 4 days. Samuel Pepys wrote about it in his diary.",
+        "After the fire, people rebuilt London with brick and stone. Christopher Wren designed a new St Paul's Cathedral."
+      ],
+      "check": {
+        "question": "Where did the Great Fire of London start?",
+        "options": ["In a bakery on Pudding Lane", "In a castle", "On a ship"],
+        "answer": 0,
+        "explanation": "It started in a bakery on Pudding Lane."
+      }
+    }
+  ]
+}
